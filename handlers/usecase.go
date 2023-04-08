@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"errors"
-	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/speps/go-hashids"
 )
 
@@ -15,10 +13,10 @@ type CreateShortUrlResp struct {
 
 func ShortUrlReturn(shorturl string) (*CreateShortUrlResp, error) {
 	// load
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("err loading: %v", err)
-	}
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	log.Fatalf("err loading: %v", err)
+	// }
 
 	// get
 	addr := os.Getenv("DOMAIN")
@@ -28,7 +26,7 @@ func ShortUrlReturn(shorturl string) (*CreateShortUrlResp, error) {
 
 	return &CreateShortUrlResp{
 		ShortUrl: addr + "/" + shorturl,
-	}, err
+	}, nil
 }
 
 // method create url = 7 symbols

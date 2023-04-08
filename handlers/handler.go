@@ -11,12 +11,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type UseRepository struct {
+type useRepository struct {
 	PsqlRepos *repository.InquirysRepository
 }
 
-func NewUseRepository(Repo *repository.InquirysRepository) *UseRepository {
-	return &UseRepository{PsqlRepos: Repo}
+func NewUseRepository(Repo *repository.InquirysRepository) *useRepository {
+	return &useRepository{PsqlRepos: Repo}
 }
 
 type HandlerInterface interface {
@@ -27,7 +27,7 @@ type UrlReqStruct struct {
 	Url string `json:"url"`
 }
 
-func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
+func (rep *useRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		originalurl   UrlReqStruct
@@ -96,7 +96,7 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 // Сервис проверят, нет ли уже такого URL в базе данных. Если входящий длинный URL уже существует в системе, то в ней остался и сгенерированный короткий вариант.
 // Если длинного URL нет в базе данных или срок действия сокращённой ссылки истёк, необходимо создать новый токен и отправить короткий URL в качестве ответа, сохранив результат в базе данных.
 // Сервис отправляет короткий URL в качестве ответа. Статус HTTP 201, если создана новая запись или 200, если запись уже была в базе данных.
-func (rep *UseRepository) RedirectShortUrl(w http.ResponseWriter, r *http.Request) {
+func (rep *useRepository) RedirectShortUrl(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	index := vars["url_index"]
 

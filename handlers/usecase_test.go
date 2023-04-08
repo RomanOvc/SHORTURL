@@ -1,6 +1,10 @@
 package handlers
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 type UrlResult struct {
 	url    string
@@ -32,11 +36,6 @@ func TestGenerateShortUrl(t *testing.T) {
 		got, _ := GenerationShortUrl(d.url)
 		want := d.result
 
-		if got != want && len(got) == 7 {
-			t.Errorf("got %q, wanted %q", got, want)
-		} else {
-			t.Errorf("length generate url != 7:%q  generate url len =  %q", len(got), len(want))
-		}
-
+		assert.Equal(t, len(want), len(got), "got %v, wanted %v", got, want)
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/lib/pq"
 )
 
@@ -37,6 +38,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
 	router.HandleFunc("/take_larg_url", myhandler.CreateShortUrl).Methods("POST")
+
 	log.Fatal(http.ListenAndServe(":8000", router))
 
 }

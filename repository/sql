@@ -1,0 +1,10 @@
+create schema shorturl;
+
+create table shortedurl(                             
+    id serial primary key not null,
+    shorturl varchar(7) not null,
+    originalurl varchar(100000) not null, UNIQUE(shorturl,originalurl)
+);
+
+
+create index shorturl_index on shortedurl (shorturl);

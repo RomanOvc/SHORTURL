@@ -46,17 +46,18 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewDecoder(r.Body).Decode(&originalurl)
+	err = json.NewDecoder(r.Body).Decode(&originalurl)
+	if err != nil {
+		return
+	}
 
 	validURL, err := url.ParseRequestURI(originalurl.Url)
 	if err != nil {
 		return
 	}
 
-	generateUrl, err := GenerationShortUrl(validURL.String())
-	if err != nil {
-		return
-	}
+	log.Println(validURL.Path)
+	generateUrl := GenerationShortUrl(validURL.String())
 
 	checkUrlDb, err := rep.PsqlRepos.SelectShortUrlCount(generateUrl)
 	if err != nil {
@@ -65,10 +66,8 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 
 	if checkUrlDb == 1 {
 
-		url, err := ShortUrlReturn(generateUrl)
-		if err != nil {
-			return
-		}
+		url := ShortUrlReturn(generateUrl)
+
 		handlerResult, err = json.Marshal(url)
 		if err != nil {
 			return
@@ -79,10 +78,7 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 	} else {
 		rep.PsqlRepos.AddGenerateUrl(generateUrl, originalurl.Url)
 
-		jsonUrl, err := ShortUrlReturn(generateUrl)
-		if err != nil {
-			return
-		}
+		jsonUrl := ShortUrlReturn(generateUrl)
 
 		handlerResult, err = json.Marshal(jsonUrl)
 		if err != nil {
@@ -92,19 +88,15 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// Сервис принимает длинный URL, пришедший в POST-запросе.
-// Сервис проверят, нет ли уже такого URL в базе данных. Если входящий длинный URL уже существует в системе, то в ней остался и сгенерированный короткий вариант.
-// Если длинного URL нет в базе данных или срок действия сокращённой ссылки истёк, необходимо создать новый токен и отправить короткий URL в качестве ответа, сохранив результат в базе данных.
-// Сервис отправляет короткий URL в качестве ответа. Статус HTTP 201, если создана новая запись или 200, если запись уже была в базе данных.
 func (rep *UseRepository) RedirectShortUrl(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	index := vars["url_index"]
 
 	checkUrlDb, err := rep.PsqlRepos.SelectOriginalUrl(index)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("404 page not found"))
+		http.Redirect(w, r, "/", http.StatusNotFound)
 	} else {
-		http.Redirect(w, r, checkUrlDb, http.StatusSeeOther)
+		http.Redirect(w, r, checkUrlDb, http.StatusFound)
 	}
+
 }

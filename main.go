@@ -37,6 +37,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
 	router.HandleFunc("/take_larg_url", myhandler.CreateShortUrl).Methods("POST")
+
 	log.Fatal(http.ListenAndServe(":8000", router))
 
 }

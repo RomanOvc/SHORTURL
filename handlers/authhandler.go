@@ -3,7 +3,6 @@ package handlers
 import (
 	"appurl/repository"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"time"
@@ -52,28 +51,30 @@ func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Re
 		return
 	}
 	//  если хотя бы одно поле пришло пустым возвращать 400
+	// FIXME UserEmail
 	if userInfo.Usermail == "" || userInfo.Password == "" {
 		w.WriteHeader(http.StatusBadRequest)
-	} else {
-		// иначе проверяем, есть ли пользователь с таким mail в базе
-		emptyUser := rep.Psql.SelectUserMail(r.Context(), userInfo.Usermail)
+		return
+	}
 
-		// если нет пользователя добавлем его в базу и отправлем письмо, условныи оператор - костыль, надо переписать
-		if emptyUser == 0 {
+	// иначе проверяем, есть ли пользователь с таким mail в базе
+	emptyUser := rep.Psql.SelectUserMail(r.Context(), userInfo.Usermail)
 
-			hashPassword, _ := HashPassword(userInfo.Password)
+	// если нет пользователя добавлем его в базу и отправлем письмо, условныи оператор - костыль, надо переписать
+	if emptyUser == 0 {
 
-			generateActivUuid, err := rep.Psql.CreateUser(r.Context(), userInfo.Usermail, hashPassword, false)
-			if err != nil {
-				return
-			}
+		hashPassword, _ := HashPassword(userInfo.Password)
 
-			// путь убрать в .env
-			strUrl := "http://127.0.0.1:8000/create_user/activate/" + generateActivUuid
-			_, err = Gsmtp(userInfo.Usermail, strUrl)
-			if err != nil {
-				return
-			}
+		generateActivUuid, err := rep.Psql.CreateUser(r.Context(), userInfo.Usermail, hashPassword, false)
+		if err != nil {
+			return
+		}
+
+		// путь убрать в .env
+		strUrl := "http://127.0.0.1:8000/create_user/activate/" + generateActivUuid
+		_, err = Gsmtp(userInfo.Usermail, strUrl)
+		if err != nil {
+			return
 		}
 	}
 }
@@ -86,6 +87,7 @@ func (rep *AuthInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http
 
 	err := rep.Psql.CheckUserUuidToEmail(r.Context(), index)
 	if err != nil {
+		// FIXME handle this error
 		return
 	}
 }
@@ -117,7 +119,8 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	w.Header().Set("Content-Type", "application/json")
 
 	err = json.NewDecoder(r.Body).Decode(&userInfo)
-	if err == io.EOF {
+	if err != nil {
+		err = errors.Wrap(err, "decode")
 		return
 	}
 	log.Println(userInfo)
@@ -128,23 +131,28 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 		// если пользователя нет, то статус 400
 		log.Println("bad user")
 		w.WriteHeader(http.StatusBadRequest)
+		// FIXME добавь return и сотри else
 	} else {
 		// проверка пароля
 		checkPass := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
 		if checkPass == nil {
 			// генерация access и refresh токена
+			var (
+				updateFieldRefreshToken int
+				addAccessTokenToRedis   string
+			)
 
 			accessToken, _ := GenerateAcceessToken(user.UserId, user.Usermail)
 			refreshToken, _ := GenerateRefreshToken(user.UserId)
 
 			// добавить токен в редис
-			addAccessTokenToRedis, err := rep.Redis.AddAccessToken(r.Context(), user.Usermail, accessToken)
+			addAccessTokenToRedis, err = rep.Redis.AddAccessToken(r.Context(), user.Usermail, accessToken)
 			if err != nil {
 				return
 			}
 			log.Println(addAccessTokenToRedis)
 			// обнавление refresh token в db
-			updateFieldRefreshToken, err := rep.Psql.UpdateRefershTokenForUser(r.Context(), user.UserId, refreshToken)
+			updateFieldRefreshToken, err = rep.Psql.UpdateRefershTokenForUser(r.Context(), user.UserId, refreshToken)
 			if err != nil {
 				return
 			}
@@ -153,6 +161,8 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 			if updateFieldRefreshToken != 0 {
 				u, err = json.Marshal(AccessRefreshToken(accessToken, refreshToken))
 				if err != nil {
+					// FIXME handle error
+					err = errors.Wrap(err, "marshal")
 					return
 				}
 				log.Println("acceess and refresh tokens access")
@@ -217,6 +227,10 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 
 	// проверка наличия пользователя по id
 	checkUserId := rep.Psql.SelectByUserId(r.Context(), userId)
+	// FIXME
+	// if checkUserId.UserId == 0 || tokenExp > timeNow || rT.RefreshToken != checkUserId.RefreshToken {
+	// ERROR
+	// }
 	if checkUserId.UserId != 0 && tokenExp > timeNow && rT.RefreshToken == checkUserId.RefreshToken {
 		// генерация токенов
 		accessToken, _ := GenerateAcceessToken(checkUserId.UserId, checkUserId.Usermail)
@@ -235,6 +249,7 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 		}
 		log.Println("updateFieldRefreshToken ", updateFieldRefreshToken)
 
+		// FIXME if updateFieldRefreshToken == 0 then error
 		if updateFieldRefreshToken != 0 {
 			u, err = json.Marshal(AccessRefreshToken(accessToken, refreshToken))
 			if err != nil {
@@ -244,6 +259,7 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 		}
 		// если присланныи refresh токен валидныи и не протух, генерим новую пару, иначе отправлеяем пользователя на auth
 	} else {
+		// FIXME не нужно
 		// юсер не валидныи
 		log.Println("not valid")
 		u, err = json.Marshal(&MessageReq{Message: "http://127.0.0.1:8000/create_user"})
@@ -253,6 +269,7 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	}
 }
 
+// FIXME перенеси её в отдельный файл example: "middleware.go"
 // middleware for checck token
 func (rep *AuthInquirysRepository) IsAuth(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

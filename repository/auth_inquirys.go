@@ -106,10 +106,16 @@ func (r *AuthInquirysRepository) UpdateActivateStatus(ctx context.Context, userm
 }
 
 // ????????????????????
+// FIXME maybe select user id by email
 func (r *AuthInquirysRepository) SelectUserMail(ctx context.Context, userEmail string) int {
 	var userId int
 
 	_ = r.db.QueryRowContext(ctx, "SELECT user_id from users where usermail = $1 ", userEmail).Scan(&userId)
+	// FIXME handle error
+	// if err != nil {
+	// 	return errors.Wrap(err, "select user id by email")
+	// }
+
 	return userId
 }
 

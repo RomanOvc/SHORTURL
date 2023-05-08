@@ -51,14 +51,21 @@ func main() {
 	// router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
 	//  router.HandleFunc("/take_larg_urls", myhandler.CreateShortUrl).Methods("POST")
 
+	// FIXME авторизация на использование не нужна, добавить запись с юзер агентом в базу
 	router.Handle("/{url_index}", authHandler.IsAuth(myhandler.RedirectShortUrl)).Methods("GET")
 	router.Handle("/take_larg_url", authHandler.IsAuth(myhandler.CreateShortUrl)).Methods("POST")
 
 	// create handlers
+	// FIXME auth block
 	router.HandleFunc("/create_user", authHandler.CreateUserH).Methods("POST")
 	router.HandleFunc("/create_user/activate/{uuid}", authHandler.EmailActivateH).Methods("GET")
 
-	// authentication handler
+	// authentication handler (auth)
+
+	// Регистрация 		   POST /auth
+	// Авторизация 		   PUT /auth
+	// Рефреш 	   		   POST /auth/refresh
+	// Подтверждение почты GET /auth/confirm/{uuid}
 	router.HandleFunc("/authentication", authHandler.AuthentificateUserH).Methods("POST")
 	router.HandleFunc("/authentication/refresh_token", authHandler.RefreshTokenH).Methods("POST")
 	router.HandleFunc("/authentication/forgot_pass", authHandler.ForgotPasswordH).Methods("POST") //сменить на PATCH

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// FIXME SendEmail
 func Gsmtp(usermail, genUrl string) (bool, error) {
 	body := genUrl
 	from := "roman.ovcharov.1997@gmail.com"

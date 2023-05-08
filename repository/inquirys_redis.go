@@ -27,6 +27,7 @@ func (r *RedisClient) AddAccessToken(ctx context.Context, usermail, accessToken 
 	if err != nil {
 		errors.Wrapf(err, "error 'set comand to redis' repository/inqurys_redis  AddAccessToken()")
 	}
+	// FIXME "ok"
 	return "ok", err
 }
 

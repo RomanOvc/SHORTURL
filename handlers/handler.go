@@ -27,6 +27,10 @@ type UrlReqStruct struct {
 	Url string `json:"url"`
 }
 
+// waiting json type
+// {
+// "url":"path_url"
+// }
 func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 
 	var (

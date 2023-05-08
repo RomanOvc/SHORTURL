@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -19,7 +21,7 @@ func main() {
 		log.Fatalf("err loading: %v", err)
 	}
 
-	db, err := repository.InitPostgresDb(repository.PsqlConfig{
+	dbPostgres, err := repository.InitPostgresDb(repository.PsqlConfig{
 		Host:     os.Getenv("host"),
 		Port:     os.Getenv("port"),
 		Username: os.Getenv("username"),
@@ -31,13 +33,45 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rep := repository.NewInquirysRepository(db)
+	dbRedis := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	redisClient := repository.NewRedisreposiory(dbRedis)
+
+	authrep := repository.NewAuthInquirysRepository(dbPostgres)
+	authHandler := handlers.NewAuthInquirysRepository(authrep, redisClient)
+	rep := repository.NewInquirysRepository(dbPostgres)
 	myhandler := handlers.NewUseRepository(rep)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
-	router.HandleFunc("/take_larg_url", myhandler.CreateShortUrl).Methods("POST")
 
-	log.Fatal(http.ListenAndServe(":8000", router))
+	// router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
+	//  router.HandleFunc("/take_larg_urls", myhandler.CreateShortUrl).Methods("POST")
+
+	router.Handle("/{url_index}", authHandler.IsAuth(myhandler.RedirectShortUrl)).Methods("GET")
+	router.Handle("/take_larg_url", authHandler.IsAuth(myhandler.CreateShortUrl)).Methods("POST")
+
+	// create handlers
+	router.HandleFunc("/create_user", authHandler.CreateUserH).Methods("POST")
+	router.HandleFunc("/create_user/activate/{uuid}", authHandler.EmailActivateH).Methods("GET")
+
+	// authentication handler
+	router.HandleFunc("/authentication", authHandler.AuthentificateUserH).Methods("POST")
+	router.HandleFunc("/authentication/refresh_token", authHandler.RefreshTokenH).Methods("POST")
+	router.HandleFunc("/authentication/forgot_pass", authHandler.ForgotPasswordH).Methods("POST") //сменить на PATCH
+
+	// router.HandleFunc("/update_status", authHandler.UpdateUserH).Methods("POST")
+	server := http.Server{
+		Addr:              ":8000",
+		Handler:           router,
+		ReadTimeout:       time.Second * 10,
+		WriteTimeout:      time.Second * 10,
+		ReadHeaderTimeout: time.Second * 10,
+		IdleTimeout:       time.Second * 10,
+	}
+	log.Fatal(server.ListenAndServe())
 
 }

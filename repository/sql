@@ -1,5 +1,7 @@
-create schema shorturl;
+-- postgres
 
+create schema shorturl;
+-- сокращатель ссылок (короткая и оригинальная записи)
 create table shortedurl(                             
     id serial primary key not null,
     shorturl varchar(7) not null,
@@ -8,3 +10,24 @@ create table shortedurl(
 
 
 create index shorturl_index on shortedurl (shorturl);
+
+
+
+--пользователи
+create table users (
+    user_id serial PRIMARY KEY,
+    usermail VARCHAR (100) UNIQUE NOT NULL,
+    password VARCHAR (60) NOT NULL,
+    activate BOOLEAN NOT NULL,
+    refresh_token VARCHAR NOT NULL,
+);
+
+--добавить поле роль (admin,user)
+--  create table emailactivate (
+-- uid varchar(36) not null,
+-- user_id integer not null,
+-- active_until timestamp not null);
+
+
+
+1) пользователь только зарегался и поле refresh tokena пустое -> update 

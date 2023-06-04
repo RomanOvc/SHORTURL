@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -15,6 +16,11 @@ type RedisClient struct {
 func NewRedisReposiory(redisDBTable0, redisDBTable1, redisDbTable2 *redis.Client) *RedisClient {
 	return &RedisClient{redisDbTable0: redisDBTable0, redisDbTable1: redisDBTable1, redisDbTable2: redisDbTable2}
 }
+
+var (
+	// FIXME добавить маски для записей в редисе и оставть ОДИН коннект (бд(таблицу))
+	tokensMask = "tokensMask:%s"
+)
 
 type RedisInqurysInterface interface {
 	// RedisTable 0
@@ -33,7 +39,7 @@ type RedisInqurysInterface interface {
 // вставить access token  и username
 // ["access_token"] = usermail
 func (r *RedisClient) AddAccessToken(ctx context.Context, userEmail, accessToken string) error {
-	err := r.redisDbTable0.Set(ctx, userEmail, accessToken, time.Minute*15).Err()
+	err := r.redisDbTable0.Set(ctx, fmt.Sprintf(tokensMask, userEmail), accessToken, time.Minute*15).Err()
 	if err != nil {
 		errors.Wrapf(err, "error 'set comand to redis' repository/inqurys_redis  AddAccessAndRefreshToken()")
 	}

@@ -12,8 +12,8 @@ func RunCronJob(db *sql.DB) {
 	s := gocron.NewScheduler(time.UTC)
 	ctx := context.TODO()
 	s.Cron("0 1 * * *").Do(func() {
-		AddCountVisitOnIURLPerDay(db, ctx)
+		addCountVisitOnIURLPerDay(db, ctx)
 	})
-	s.StartBlocking()
 
+	s.StartBlocking()
 }

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"appurl/crontasks"
 	"appurl/handlers"
+	"appurl/middlewars"
 	"appurl/repository"
 	"log"
 	"net/http"
@@ -21,6 +23,7 @@ func main() {
 		log.Fatalf("err loading: %v", err)
 	}
 
+	// инисиальизасия postgres
 	dbPostgres, err := repository.InitPostgresDb(repository.PsqlConfig{
 		Host:     os.Getenv("host"),
 		Port:     os.Getenv("port"),
@@ -33,14 +36,26 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dbRedis := redis.NewClient(&redis.Options{
+	//
+	dbRedisTable0 := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
 	})
 
-	redisClient := repository.NewRedisreposiory(dbRedis)
+	dbRedisTable1 := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       1,
+	})
 
+	dbRedisTable2 := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       2,
+	})
+
+	redisClient := repository.NewRedisReposiory(dbRedisTable0, dbRedisTable1, dbRedisTable2)
 	authrep := repository.NewAuthInquirysRepository(dbPostgres)
 	authHandler := handlers.NewAuthInquirysRepository(authrep, redisClient)
 	rep := repository.NewInquirysRepository(dbPostgres)
@@ -48,31 +63,36 @@ func main() {
 
 	router := mux.NewRouter()
 
-	// router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
-	//  router.HandleFunc("/take_larg_urls", myhandler.CreateShortUrl).Methods("POST")
+	//TODO cron task
+	go crontasks.RunCronJob(dbPostgres)
 
-	// FIXME авторизация на использование не нужна, добавить запись с юзер агентом в базу
-	router.Handle("/{url_index}", authHandler.IsAuth(myhandler.RedirectShortUrl)).Methods("GET")
-	router.Handle("/take_larg_url", authHandler.IsAuth(myhandler.CreateShortUrl)).Methods("POST")
+	// isAuth := middlewars.NewAuthInquirysRepository(authrep, redisClient)
+	isAuth := middlewars.IsAuth(authrep, redisClient)
 
-	// create handlers
-	// FIXME auth block
-	router.HandleFunc("/create_user", authHandler.CreateUserH).Methods("POST")
-	router.HandleFunc("/create_user/activate/{uuid}", authHandler.EmailActivateH).Methods("GET")
+	//
+	router.HandleFunc("/{url_index}", myhandler.RedirectShortUrl).Methods("GET")
+	// Аворизаия нужна
+	router.Handle("/take_larg_url", isAuth(myhandler.CreateShortUrl)).Methods("POST")
+	router.Handle("/user/all_user_urls", isAuth(myhandler.AllUsersUrls)).Methods("GET")
 
-	// authentication handler (auth)
+	// статистика посещении по юрл
+	router.Handle("/user/statistic/{url_index}", isAuth(myhandler.VisitOnUrlH)).Methods("GET")
+	router.Handle("/user/statistic/{url_index}/count_visit", isAuth(myhandler.CountVisitH)).Methods("GET")
 
+	// auth block
 	// Регистрация 		   POST /auth
 	// Авторизация 		   PUT /auth
-	// Рефреш 	   		   POST /auth/refresh
+	// Рефреш токен 	   POST /auth/refresh
 	// Подтверждение почты GET /auth/confirm/{uuid}
-	router.HandleFunc("/authentication", authHandler.AuthentificateUserH).Methods("POST")
-	router.HandleFunc("/authentication/refresh_token", authHandler.RefreshTokenH).Methods("POST")
-	router.HandleFunc("/authentication/forgot_pass", authHandler.ForgotPasswordH).Methods("POST") //сменить на PATCH
+	router.HandleFunc("/auth", authHandler.CreateUserH).Methods("POST")
+	router.HandleFunc("/auth", authHandler.AuthentificateUserH).Methods("PUT")
+	router.HandleFunc("/auth/refresh", authHandler.RefreshTokenH).Methods("POST")
+	router.HandleFunc("/auth/confirm/{uuid}", authHandler.EmailActivateH).Methods("GET")
+	router.HandleFunc("/auth/forgotpass", authHandler.ForgotPasswordH).Methods("POST") //сменить на PATCH
+	// router.HandleFunc("/auth/logout", authHandler.LogoutH).Methods("GET")
 
-	// router.HandleFunc("/update_status", authHandler.UpdateUserH).Methods("POST")
 	server := http.Server{
-		Addr:              ":8000",
+		Addr:              ":8001",
 		Handler:           router,
 		ReadTimeout:       time.Second * 10,
 		WriteTimeout:      time.Second * 10,

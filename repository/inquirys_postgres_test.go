@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"regexp"
 	"testing"
 
@@ -91,33 +92,59 @@ func TestSelectOriginalUrl(t *testing.T) {
 }
 
 func TestAddGenerateUrl(t *testing.T) {
+
 	testcase := []struct {
 		shorturl    string
 		originalurl string
+		userId      int
+		userEmail   string
 		mocka       func(sqlmock.Sqlmock)
-		result      bool
+		result      string
 	}{
 		{
-			shorturl:    "asd",
-			originalurl: "asd",
+			shorturl:    "lLKHpIy",
+			originalurl: "https://www.google.com/search?q=translate&oq=tran&aqs=chrome.1.69i57j35i39i650l2j0i512l2j69i65l3.6679j0j7&sourceid=chrome&ie=UTF-8",
+			userId:      1,
+
 			mocka: func(s sqlmock.Sqlmock) {
-				s.ExpectExec(regexp.QuoteMeta(`INSERT INTO shortedurl (shorturl, originalurl) VALUES ($1, $2)`)).
-					WithArgs("", "").WillReturnResult(sqlmock.NewResult(0, 0))
+
+				s.ExpectBegin()
+
+				s.ExpectQuery(regexp.QuoteMeta(`SELECT user_id from users where usermail=$1`)).
+					WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow("1"))
+
+				s.ExpectQuery(regexp.QuoteMeta(`INSERT INTO shortedurl (shorturl, originalurl,userid) VALUES ($1, $2, $3) RETURNING shorturl`)).
+					WithArgs("lLKHpIy", "https://www.google.com/search?q=translate&oq=tran&aqs=chrome.1.69i57j35i39i650l2j0i512l2j69i65l3.6679j0j7&sourceid=chrome&ie=UTF-8", 1).
+					WillReturnRows(sqlmock.NewRows([]string{"shorturl"}).AddRow("lLKHpIy"))
+
+				s.ExpectCommit()
 			},
-			result: false,
+			result: "lLKHpIy",
 		},
 		{
-			shorturl:    "asd",
-			originalurl: "asd",
+			shorturl:    "lLKHpIy",
+			originalurl: "https://www.google.com/search?q=translate&oq=tran&aqs=chrome.1.69i57j35i39i650l2j0i512l2j69i65l3.6679j0j7&sourceid=chrome&ie=UTF-8",
+			userId:      1,
+
 			mocka: func(s sqlmock.Sqlmock) {
-				s.ExpectExec(regexp.QuoteMeta(`INSERT INTO shortedurl (shorturl, originalurl) VALUES ($1, $2)`)).
-					WithArgs("asd", "asd").WillReturnResult(sqlmock.NewResult(1, 1))
+
+				s.ExpectBegin()
+
+				s.ExpectQuery(regexp.QuoteMeta(`SELECT user_id from users where usermail=$1`)).
+					WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow("1"))
+
+				s.ExpectQuery(regexp.QuoteMeta(`INSERT INTO shortedurl (shorturl, originalurl,userid) VALUES ($1, $2, $3) RETURNING shorturl`)).
+					WithArgs("asasdsda", "https://www.google.com/search?q=translate&oq=tran&aqs=chrome.1.69i57j35i39i650l2j0i512l2j69i65l3.6679j0j7&sourceid=chrome&ie=UTF-8", 1).
+					WillReturnRows(sqlmock.NewRows([]string{"shorturl"}).AddRow(""))
+
+				s.ExpectCommit()
 			},
-			result: true,
+			result: "",
 		},
 	}
 
 	for _, tc := range testcase {
+
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("%d", err)
@@ -126,7 +153,7 @@ func TestAddGenerateUrl(t *testing.T) {
 
 		tc.mocka(mock)
 
-		res, _ := NewInquirysRepository(db).AddGenerateUrl(tc.shorturl, tc.originalurl)
+		res, _ := NewInquirysRepository(db).AddGenerateUrl(context.Background(), tc.shorturl, tc.originalurl, tc.userEmail)
 
 		assert.Equal(t, tc.result, res, "%d != %d", tc.result, res)
 	}

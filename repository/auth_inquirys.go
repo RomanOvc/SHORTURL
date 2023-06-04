@@ -19,8 +19,9 @@ func NewAuthInquirysRepository(db *sql.DB) *AuthInquirysRepository {
 
 type UserInfoResponseStruct struct {
 	UserId       int
-	Usermail     string
+	UserEmail    string
 	Pass         string
+	Activate     bool
 	RefreshToken string
 }
 
@@ -35,7 +36,8 @@ func (r *AuthInquirysRepository) CreateUser(ctx context.Context, usermail, passw
 		}
 	}()
 
-	err = tx.QueryRowContext(ctx, "INSERT INTO users (usermail, password, activate) VALUES ($1, $2,$3) RETURNING user_id", usermail, password, activate).Scan(&userId)
+	createTime := time.Now()
+	err = tx.QueryRowContext(ctx, "INSERT INTO users (usermail, password, activate, create_time_user) VALUES ($1, $2, $3, $4) RETURNING user_id", usermail, password, activate, createTime).Scan(&userId)
 	if err != nil {
 		return "", errors.Wrap(err, "err insert into users")
 	}
@@ -107,40 +109,48 @@ func (r *AuthInquirysRepository) UpdateActivateStatus(ctx context.Context, userm
 
 // ????????????????????
 // FIXME maybe select user id by email
-func (r *AuthInquirysRepository) SelectUserMail(ctx context.Context, userEmail string) int {
+func (r *AuthInquirysRepository) SelectUserIdByMail(ctx context.Context, userEmail string) (int, error) {
 	var userId int
 
-	_ = r.db.QueryRowContext(ctx, "SELECT user_id from users where usermail = $1 ", userEmail).Scan(&userId)
+	err := r.db.QueryRowContext(ctx, "SELECT user_id from users where usermail = $1 ", userEmail).Scan(&userId)
 	// FIXME handle error
-	// if err != nil {
-	// 	return errors.Wrap(err, "select user id by email")
-	// }
+	if err != nil {
+		return 0, errors.Wrap(err, "select user id by email")
+	}
 
-	return userId
+	return userId, err
 }
 
 // позже будет возвращть объект пользователя, для создания токена
-func (r *AuthInquirysRepository) SelectUser(ctx context.Context, userEmail string) *UserInfoResponseStruct {
+func (r *AuthInquirysRepository) SelectUserByUserEmail(ctx context.Context, userEmail string) (*UserInfoResponseStruct, error) {
 	var userInfoRep UserInfoResponseStruct
-	row := r.db.QueryRowContext(ctx, "SELECT user_id, usermail, password FROM users where usermail = $1", userEmail)
-	row.Scan(&userInfoRep.UserId, &userInfoRep.Usermail, &userInfoRep.Pass)
-	return &userInfoRep
-}
-
-func (r *AuthInquirysRepository) SelectByUserId(ctx context.Context, userId int) *UserInfoResponseStruct {
-	// select в табл. по user_id.
-	var userInfo UserInfoResponseStruct
-	row := r.db.QueryRowContext(ctx, "SELECT user_id, usermail, refresh_token from users where user_id = $1", userId)
-	row.Scan(&userInfo.UserId, &userInfo.Usermail, &userInfo.RefreshToken)
-	return &userInfo
-}
-
-func (r *AuthInquirysRepository) UpdateRefershTokenForUser(ctx context.Context, userId int, refreshToken string) (int, error) {
-	var userIdDb int
-	err := r.db.QueryRowContext(ctx, "UPDATE users SET refresh_token=$1 where user_id = $2 RETURNING user_id ", refreshToken, userId).Scan(&userIdDb)
+	ro := r.db.QueryRowContext(ctx, "SELECT user_id, usermail, password,activate FROM users where usermail = $1", userEmail)
+	err := ro.Scan(&userInfoRep.UserId, &userInfoRep.UserEmail, &userInfoRep.Pass, &userInfoRep.Activate)
 	if err != nil {
-		return userIdDb, errors.Wrap(err, "repository/authinquirys UpdateRefershTokenForUser() method error")
+		errors.Wrap(err, "repository/auth_inquirys UpdateActivateStatus() method error")
 	}
-	return userIdDb, nil
+	return &userInfoRep, err
+}
+
+func (r *AuthInquirysRepository) SelectByUserId(ctx context.Context, userId int) (*UserInfoResponseStruct, error) {
+	// select в табл. по user_id.
+	// return { user_id,usermail}
+	var userInfo UserInfoResponseStruct
+	row := r.db.QueryRowContext(ctx, "SELECT user_id, usermail from users where user_id = $1", userId)
+	err := row.Scan(&userInfo.UserId, &userInfo.UserEmail)
+	if err != nil {
+		errors.Wrap(err, "repository/auth_inquirys SelectByUserId() method error")
+	}
+	return &userInfo, err
+}
+
+// hash origin pass
+func (r *AuthInquirysRepository) ChangePass(ctx context.Context, userEmail, hashOriginPass string) error {
+
+	err := r.db.QueryRowContext(ctx, "UPDATE users SET password=$1 where usermail=$2", hashOriginPass, userEmail).Err()
+	if err != nil {
+		errors.Wrap(err, "asdasdasdasdadasdasdasd")
+	}
+	return err
 
 }

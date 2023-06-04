@@ -13,6 +13,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	confirmURL = "http://127.0.0.1:8001/auth/confirm/"
+)
+
 type AuthInquirysRepository struct {
 	Psql  *repository.AuthInquirysRepository
 	Redis *repository.RedisClient
@@ -23,16 +27,22 @@ func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redi
 }
 
 type UserInfoStruct struct {
-	UserId   int    `json:"userId"`
-	Usermail string `json:"usermail"`
-	Password string `json:"password"`
+	UserId          int    `json:"userId"`
+	UserEmail       string `json:"usermail"`
+	ActivateAccount bool   `json:"activate"`
+	Password        string `json:"password"`
+}
+
+type MessageError struct {
+	Message string `json:"message"`
 }
 
 func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Request) {
 	var (
-		userInfo      UserInfoStruct
-		handlerResult []byte
-		err           error
+		userInfo    UserInfoStruct
+		message     []byte
+		err         error
+		statusEmail bool
 	)
 
 	defer func() {
@@ -41,55 +51,87 @@ func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Re
 			w.WriteHeader(400)
 			w.Write(nil)
 		} else {
-			w.Write(handlerResult)
+			w.Write(message)
 		}
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
-		return
-	}
-	//  если хотя бы одно поле пришло пустым возвращать 400
-	// FIXME UserEmail
-	if userInfo.Usermail == "" || userInfo.Password == "" {
-		w.WriteHeader(http.StatusBadRequest)
+		message, _ = json.Marshal(&MessageError{Message: "invalid params"})
+		log.Println("body is empty")
+
 		return
 	}
 
 	// иначе проверяем, есть ли пользователь с таким mail в базе
-	emptyUser := rep.Psql.SelectUserMail(r.Context(), userInfo.Usermail)
+	emptyUser, err := rep.Psql.SelectUserIdByMail(r.Context(), userInfo.UserEmail)
+	if err != nil {
+		log.Println("error: handler/authandler CreateUserH() in SelectUserIdByMail() ")
+		message, _ = json.Marshal("error create user")
 
-	// если нет пользователя добавлем его в базу и отправлем письмо, условныи оператор - костыль, надо переписать
-	if emptyUser == 0 {
-
-		hashPassword, _ := HashPassword(userInfo.Password)
-
-		generateActivUuid, err := rep.Psql.CreateUser(r.Context(), userInfo.Usermail, hashPassword, false)
-		if err != nil {
-			return
-		}
-
-		// путь убрать в .env
-		strUrl := "http://127.0.0.1:8000/create_user/activate/" + generateActivUuid
-		_, err = Gsmtp(userInfo.Usermail, strUrl)
-		if err != nil {
-			return
-		}
 	}
+	if userInfo.UserEmail == "" || userInfo.Password == "" || emptyUser != 0 {
+		log.Println("error: handlers/authandler CreateUserH() method SelectUSerIdMail() ")
+		message, _ = json.Marshal(&MessageError{Message: "invalid params"})
+
+		return
+	}
+	// если нет пользователя добавлем его в базу и отправлем письмо, условныи оператор - костыль, надо переписать
+
+	hashPassword, _ := HashPassword(userInfo.Password)
+
+	generateActivUuid, err := rep.Psql.CreateUser(r.Context(), userInfo.UserEmail, hashPassword, false)
+	if err != nil {
+		log.Println("error: handlers/authandler CreateUserH() method CreateUser")
+		message, _ = json.Marshal(&MessageError{Message: "user is empty"})
+
+		return
+	}
+
+	// путь убрать в .env
+	strUrl := confirmURL + generateActivUuid
+	statusEmail, err = SendEmailToConfirm(userInfo.UserEmail, strUrl)
+	if err != nil {
+		message, _ = json.Marshal(&MessageError{Message: "smtp server error"})
+		log.Println("letter not sent status email: ", statusEmail)
+
+		return
+	}
+	log.Println("message sent")
+	message, _ = json.Marshal(&MessageError{Message: "check you email"})
 }
 
 // переход по ссылке из письма
 func (rep *AuthInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http.Request) {
+	var (
+		err     error
+		message []byte
+	)
 
+	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	index := vars["uuid"]
 
-	err := rep.Psql.CheckUserUuidToEmail(r.Context(), index)
+	defer func() {
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(message)
+			log.Println("message not send")
+		} else {
+			log.Println("send message")
+			w.Write(message)
+		}
+	}()
+
+	err = rep.Psql.CheckUserUuidToEmail(r.Context(), index)
 	if err != nil {
-		// FIXME handle this error
+		log.Println("error: handlers/authandler EmailActivateH() method CheckUserUuidToEmail()")
+		message, _ = json.Marshal(&MessageError{Message: "error message"})
+
 		return
 	}
+	message, _ = json.Marshal(&MessageError{Message: "user is active"})
 }
 
 // 1) Проверить наличие пользователя в базе, правильность введеных логина и пороля
@@ -100,10 +142,9 @@ func (rep *AuthInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http
 // "password":"pass"
 // }
 func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r *http.Request) {
-	// как обработать ошибку, если тель запроса пустое вовсе
 	var (
 		userInfo UserInfoStruct
-		u        []byte
+		message  []byte
 		err      error
 	)
 
@@ -111,74 +152,87 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 		if err != nil {
 			log.Println(err, "Error request")
 			w.WriteHeader(400)
-			w.Write(nil)
+			w.Write(message)
 		} else {
-			w.Write(u)
+			w.Write(message)
 		}
 	}()
+
 	w.Header().Set("Content-Type", "application/json")
 
 	err = json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
-		err = errors.Wrap(err, "decode")
+		log.Println("error decode body handler/authhandler AuthentificateUserH() decode body")
+		message, _ = json.Marshal(&MessageError{Message: "error: body is empty"})
+
 		return
 	}
 	log.Println(userInfo)
 
-	user := rep.Psql.SelectUser(r.Context(), userInfo.Usermail)
+	user, err := rep.Psql.SelectUserByUserEmail(r.Context(), userInfo.UserEmail)
+	if err != nil {
+		log.Println("user is empty")
+		message, _ = json.Marshal(&MessageError{Message: "user does not exist"})
 
-	if user.Usermail == "" || r.Body == http.NoBody {
+		return
+	}
+
+	if user.UserEmail == "" || r.Body == http.NoBody {
 		// если пользователя нет, то статус 400
-		log.Println("bad user")
 		w.WriteHeader(http.StatusBadRequest)
-		// FIXME добавь return и сотри else
-	} else {
-		// проверка пароля
-		checkPass := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
-		if checkPass == nil {
-			// генерация access и refresh токена
-			var (
-				updateFieldRefreshToken int
-				addAccessTokenToRedis   string
-			)
+		// TODO -  добавить обработку ошибки
+		return
+	}
+	// проверка пароля
+	checkPass := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
+	if checkPass != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		// TODO -  добавить обработку ошибки
+		return
+	}
 
-			accessToken, _ := GenerateAcceessToken(user.UserId, user.Usermail)
-			refreshToken, _ := GenerateRefreshToken(user.UserId)
+	if !user.Activate {
+		log.Println("user не активировал аккаунт")
+		message, _ = json.Marshal(&MessageError{Message: "check mail and activate account"})
 
-			// добавить токен в редис
-			addAccessTokenToRedis, err = rep.Redis.AddAccessToken(r.Context(), user.Usermail, accessToken)
-			if err != nil {
-				return
-			}
-			log.Println(addAccessTokenToRedis)
-			// обнавление refresh token в db
-			updateFieldRefreshToken, err = rep.Psql.UpdateRefershTokenForUser(r.Context(), user.UserId, refreshToken)
-			if err != nil {
-				return
-			}
-			log.Println("updateFieldRefreshToken ", updateFieldRefreshToken)
+		return
+	}
+	accessToken, _ := GenerateAcceessToken(user.UserId, user.UserEmail, user.Activate)
+	refreshToken, _ := GenerateRefreshToken(user.UserId, user.Activate)
 
-			if updateFieldRefreshToken != 0 {
-				u, err = json.Marshal(AccessRefreshToken(accessToken, refreshToken))
-				if err != nil {
-					// FIXME handle error
-					err = errors.Wrap(err, "marshal")
-					return
-				}
-				log.Println("acceess and refresh tokens access")
-			}
+	// добавить токен в редис
+	// Собрать в json и отправить
+	// access и refresh tokens записывать в разные таблички
 
-		} else {
-			// иначе статус 400
-			w.WriteHeader(http.StatusBadRequest)
-			log.Println("bad pass")
-		}
+	// access token
+	err = rep.Redis.AddAccessToken(r.Context(), user.UserEmail, accessToken)
+	if err != nil {
+		log.Println("error AddAccessToken")
+		// TODO -  добавить обработку ошибки
+		return
+	}
+	// refresh token
+	err = rep.Redis.AddRefreshToken(r.Context(), user.UserEmail, refreshToken)
+	if err != nil {
+		log.Println("error AddRefreshToken")
+		// TODO -  добавить обработку ошибки
+		return
+	}
+
+	// return pair access and refresh tokens
+	message, err = json.Marshal(AccessRefreshToken(accessToken, refreshToken))
+	if err != nil {
+		message, _ = json.Marshal(&MessageError{Message: "error: marshal "})
+		log.Println("error MArshal AcessRefreshToken()")
+
+		return
 	}
 }
 
 type RefreshTokenStruct struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
 type MessageReq struct {
 	Message string
 }
@@ -193,140 +247,267 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	// 7) если refresh token е протух, то гененрируем новую пару токенов
 	// 8) если refresh token протух, перенаправляем на auth
 	var (
-		u   []byte
-		err error
+		message []byte
+		err     error
 	)
 	w.Header().Set("Content-Type", "application/json")
 
 	defer func() {
 		if err != nil {
-			log.Println(err, "Error request")
+			log.Println(err, "Error xtyyuyg")
 			w.WriteHeader(400)
-			w.Write(nil)
+			w.Write(message)
 		} else {
-			w.Write(u)
+			w.Write(message)
 		}
 	}()
+
 	var rT RefreshTokenStruct
 	err = json.NewDecoder(r.Body).Decode(&rT)
 	if err != nil {
+		message, _ = json.Marshal(&MessageError{Message: "body is empty"})
+		log.Println("error: handlers/authandler RefreshTokenH() Decode()")
+
 		return
 	}
-
+	// TODO
 	token, err := jwt.Parse(rT.RefreshToken, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.Wrap(err, "token not parsed")
 		}
-		return mySignedAccessRefreshToken, err
+
+		return MySignedAccessRefreshToken, err
 	})
-	//
+	if err != nil {
+		log.Println("error auth")
+		message, _ = json.Marshal(&MessageError{Message: "unauth"})
+		return
+	}
+
+	log.Println(token)
 
 	userId := int(token.Claims.(jwt.MapClaims)["userId"].(float64))
 	tokenExp := int(token.Claims.(jwt.MapClaims)["exp"].(float64))
 	timeNow := int(time.Now().Unix())
 
 	// проверка наличия пользователя по id
-	checkUserId := rep.Psql.SelectByUserId(r.Context(), userId)
-	// FIXME
-	// if checkUserId.UserId == 0 || tokenExp > timeNow || rT.RefreshToken != checkUserId.RefreshToken {
-	// ERROR
-	// }
-	if checkUserId.UserId != 0 && tokenExp > timeNow && rT.RefreshToken == checkUserId.RefreshToken {
-		// генерация токенов
-		accessToken, _ := GenerateAcceessToken(checkUserId.UserId, checkUserId.Usermail)
-		refreshToken, _ := GenerateRefreshToken(checkUserId.UserId)
-		// добавление access токена в redis
-		addAccessTokenToRedis, err := rep.Redis.AddAccessToken(r.Context(), checkUserId.Usermail, accessToken)
-		if err != nil {
-			return
-		}
-		log.Println(addAccessTokenToRedis)
+	checkUserId, err := rep.Psql.SelectByUserId(r.Context(), userId)
+	if err != nil {
+		log.Println("error handler/authandler RefreshTokenH() in SelectByUserId()")
+		message, _ = json.Marshal(&MessageError{Message: "no empty user or not valid token"})
 
-		// обнавление поля refresh токена в postgres
-		updateFieldRefreshToken, err := rep.Psql.UpdateRefershTokenForUser(r.Context(), checkUserId.UserId, refreshToken)
-		if err != nil {
-			return
-		}
-		log.Println("updateFieldRefreshToken ", updateFieldRefreshToken)
-
-		// FIXME if updateFieldRefreshToken == 0 then error
-		if updateFieldRefreshToken != 0 {
-			u, err = json.Marshal(AccessRefreshToken(accessToken, refreshToken))
-			if err != nil {
-				return
-			}
-			log.Println("acceess and refresh tokens access")
-		}
-		// если присланныи refresh токен валидныи и не протух, генерим новую пару, иначе отправлеяем пользователя на auth
-	} else {
-		// FIXME не нужно
-		// юсер не валидныи
-		log.Println("not valid")
-		u, err = json.Marshal(&MessageReq{Message: "http://127.0.0.1:8000/create_user"})
-		if err != nil {
-			return
-		}
+		return
 	}
-}
 
-// FIXME перенеси её в отдельный файл example: "middleware.go"
-// middleware for checck token
-func (rep *AuthInquirysRepository) IsAuth(next http.HandlerFunc) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		var tokenHeader = r.Header["Token"]
+	log.Println(checkUserId)
 
-		if r.Header["Token"][0] == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-		} else {
+	checkRefreshToken, err := rep.Redis.GetRefreshTokenByUserEmail(r.Context(), checkUserId.UserEmail)
+	if err != nil {
+		log.Println("error handler/authandler RefreshTokenH() in GetRefreshTokenByUSerEmail()")
+		message, _ = json.Marshal(&MessageError{Message: "no empty user or not valid token"})
 
-			// парсим токен
-			token, _ := jwt.Parse(tokenHeader[0], func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, errors.New("There was an error")
-				}
-				return mySignedAccessRefreshToken, nil
-			})
+		return
+	}
+	log.Println(checkRefreshToken)
 
-			// claim по "exp" - expire time
-			tokenExp := int(token.Claims.(jwt.MapClaims)["exp"].(float64))
-			// текущее время
-			timeNow := int(time.Now().Unix())
-			// claim по "usermail" - имя пользователя
-			usermail := token.Claims.(jwt.MapClaims)["usermail"].(string)
-			// проверяем наличие ключа в redis. Если успешно, возвращаем acceess токен по ключу
-			accessTokenFromRedis, _ := rep.Redis.GetAccessTokenByUsermail(r.Context(), usermail)
+	// // // если присланныи refresh токен валидныи и не протух, генерим новую пару, иначе  сообщаем, что токен не валиден
+	if checkUserId.UserId == 0 || tokenExp < timeNow || rT.RefreshToken != checkRefreshToken {
+		w.WriteHeader(http.StatusBadRequest)
+		message, _ = json.Marshal(&MessageError{Message: "no empty user or not valid token"})
 
-			log.Println("this token", r.Header["Token"][0])
-			log.Println("access token redis ", accessTokenFromRedis)
+		return
+	}
 
-			// проверяется полученыи токен от пользователя на время жизни токена, валидность, и наличие в redis
-			if token.Raw == accessTokenFromRedis && tokenExp > timeNow && token.Valid {
-				next.ServeHTTP(w, r)
-			} else {
-				w.WriteHeader(401)
-				w.Write(nil)
-				return
-			}
-		}
-	})
+	// // генерация токенов
+	accessToken, _ := GenerateAcceessToken(checkUserId.UserId, checkUserId.UserEmail, checkUserId.Activate)
+	refreshToken, _ := GenerateRefreshToken(checkUserId.UserId, checkUserId.Activate)
+	// // добавление access токена в redis
+
+	err = rep.Redis.AddAccessToken(r.Context(), checkUserId.UserEmail, accessToken)
+	if err != nil {
+		message, _ = json.Marshal(&MessageError{Message: "error add access token"})
+		log.Println("error AddAccessToken() in handler/authhandler RefreshTokenH() ")
+
+		return
+	}
+
+	err = rep.Redis.AddRefreshToken(r.Context(), checkUserId.UserEmail, refreshToken)
+	if err != nil {
+		message, _ = json.Marshal(&MessageError{Message: "error add refresh token"})
+		log.Println("error AddRefreshToken() in handler/authhandler RefreshTokenH() ")
+
+		return
+	}
+
+	message, _ = json.Marshal(&AccessAndRefreshToken{AccessToken: accessToken, RefreshToken: refreshToken})
+	if err != nil {
+		message, _ = json.Marshal(&MessageError{Message: "error response tokens"})
+		log.Println("error marshal")
+
+		return
+	}
+
 }
 
 // запрос на смену парол
 // пользователь вводит свои пароль
-type ChangePassStruct struct {
-	Email string `json:"email"`
+type CheckUserStruct struct {
+	Email string `json:"useremail"`
 }
 
 func (rep *AuthInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *http.Request) {
-	log.Println("changepass")
+	w.Header().Set("Content-Type", "application/json")
+	var (
+		message        []byte
+		err            error
+		checkUser      CheckUserStruct
+		checkUserEmail *repository.UserInfoResponseStruct
+		resetToken     string
+	)
+	defer func() {
+		if err != nil {
+			log.Println("error handler/authhandler ForgotPasswordH()")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(message)
+		} else {
+			w.Write(message)
+		}
+	}()
+
 	// если пользователь есть отправить письмо на почту, если нет сообщить что пользователя нет
-	var changePass ChangePassStruct
-	err := json.NewDecoder(r.Body).Decode(&changePass)
+	err = json.NewDecoder(r.Body).Decode(&checkUser)
 	if err != nil {
+		log.Println("error decode data")
+		message, _ = json.Marshal(&MessageError{Message: "invalid data handler/authhandler ForgotPasswordH()"})
+
 		return
 	}
 
-	log.Println(changePass.Email)
+	checkUserEmail, err = rep.Psql.SelectUserByUserEmail(r.Context(), checkUser.Email)
+	if err != nil {
+		log.Println("error SelectUserByUserEmail() in handler/authhandler ForgotPasswordH()")
+		message, _ = json.Marshal(&MessageError{Message: "user does not exist"})
+
+		return
+	}
+
+	resetToken, err = GenerateResetToken(checkUserEmail.UserEmail, checkUserEmail.UserId)
+	if err != nil {
+		log.Println("error: handlers/authhandler ForgotPasswordH() method GenerateResetToken()")
+		message, _ = json.Marshal(&MessageError{Message: "reset token generation error"})
+
+		return
+	}
+
+	if resetToken == "" {
+		log.Println("error generate token")
+		message, _ = json.Marshal(&MessageError{Message: "token not generate"})
+
+		return
+	}
+
+	log.Println("generated reset token : ", resetToken)
+
+	err = rep.Redis.AddResetToken(r.Context(), resetToken, checkUserEmail.UserEmail)
+	if err != nil {
+		log.Println("error in handlers/authhandler/ForgotPasswordH() AddRedisToken() ")
+		message, _ = json.Marshal(&MessageError{Message: "error validation token"})
+
+		return
+	}
+	// отправить письмо на почту
+	err = SendEmailToPassReset(checkUserEmail.UserEmail, resetToken)
+	if err != nil {
+		log.Println("error  in handlers/authhandler/ForgotPasswordH() SendEmailToPassReset() method")
+		message, _ = json.Marshal(&MessageError{Message: "error send message"})
+
+		return
+	}
+
+	message, err = json.Marshal(&MessageError{Message: "a letter has been sent to your mail"})
+	if err != nil {
+		log.Println("error  in marshal json handler/authhandler SendEmailToPassReset() method")
+		message, _ = json.Marshal(&MessageError{Message: "error send message"})
+
+		return
+	}
+}
+
+type ChangePassStruct struct {
+	OriginPass  string `json:"origin_pass"`
+	ConfirmPass string `json:"confirm_pass"`
+}
+
+func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Request) {
+	// проверяем url и токен из письма
+	// сверили токен с ключом из redis
+	// если успешно, то получили значение по ключу
+	// проверили переданные original pass и confirm pass
+	// если они совпали, то хешируем original pass
+	// обновление пароля по пользователю
+	//
+	w.Header().Set("contet-type", "applicateion/json")
+	var (
+		changePass ChangePassStruct
+		message    []byte
+		err        error
+	)
+	defer func() {
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(message)
+		} else {
+			w.Write(message)
+		}
+	}()
+
+	vars := mux.Vars(r)
+	resetToken := vars["resetToken"]
+
+	userEmailFromRedis, err := rep.Redis.GetResetTokenForCheckUserEmail(r.Context(), resetToken)
+	if err != nil {
+		log.Println("invalid token GetResetTokenForCheckUserEmail() in hendlers/authhandler ResetPassH()")
+		message, _ = json.Marshal(&MessageError{Message: "invalid request"})
+
+		return
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&changePass)
+	if err != nil {
+		log.Println("error body")
+		message, _ = json.Marshal(&MessageError{Message: "invalid data"})
+
+		return
+	}
+
+	if changePass.ConfirmPass != changePass.OriginPass {
+		log.Println("passwords must be different")
+		message, _ = json.Marshal(&MessageError{Message: "passwords must be different"})
+
+		return
+	}
+
+	hashOriginPass, err := HashPassword(changePass.OriginPass)
+	if err != nil {
+		log.Println("password hash error")
+		message, _ = json.Marshal(&MessageError{Message: "error update pass"})
+
+		return
+	}
+
+	err = rep.Psql.ChangePass(r.Context(), userEmailFromRedis, hashOriginPass)
+	if err != nil {
+		log.Println("error update ChangePass() in to handlers/authhandler")
+		message, _ = json.Marshal(&MessageError{Message: "an error occurred while updating the password"})
+
+		return
+	}
+
+	message, _ = json.Marshal(&MessageError{Message: "successfuljt password reset "})
 
 }
+
+// func (rep *AuthInquirysRepository) LogoutH(w http.ResponseWriter, r *http.Request) {
+// 	// полученныи токен поместить в black list до истечения
+
+// }

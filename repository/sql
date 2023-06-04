@@ -1,33 +1,88 @@
--- postgres
+// -- postgres
 
-create schema shorturl;
--- сокращатель ссылок (короткая и оригинальная записи)
-create table shortedurl(                             
-    id serial primary key not null,
-    shorturl varchar(7) not null,
-    originalurl varchar(100000) not null, UNIQUE(shorturl,originalurl)
-);
+// // create schema shorturl;
+// // -- сокращатель ссылок (короткая и оригинальная записи)
+// create table shortedurl(                             
+//     id serial primary key not null,
+//     shorturl varchar(7) not null,
+//     originalurl varchar(100000) not null, UNIQUE(shorturl,originalurl)
+//     userid integer
+// );
+
+// create index shorturl_index on shortedurl (shorturl);
+
+// --пользователи
+// create table users (
+//     user_id serial PRIMARY KEY,
+//     usermail VARCHAR (100) UNIQUE NOT NULL,
+//     password VARCHAR (60) NOT NULL,
+//     activate BOOLEAN NOT NULL,
+//     create_time_user TIMESTAMP with time zone NULL   
+// );
+
+// --добавить поле роль (admin,user)
+// --  create table emailactivate (
+// -- uid varchar(36) not null,
+// -- user_id integer not null,
+// -- active_until timestamp not null);
+
+// ; activity tabel ->  
+// create table activity(
+//     activity_id serial primary key not null,
+//     shorturl varchar not null,
+//     useragent varchar not null,
+//     platform varchar not null,
+//     click_time TIMESTAMP with time zone NULL
+//                TIMESTAMP with time zone NULL 
+// );
 
 
-create index shorturl_index on shortedurl (shorturl);
+// агрегирующая функция, которая находит платформы, которые просматривали ссылку и количесвто по каждои платформе
+// select platform,count(platform) from activity where shorturl='http://127.0.0.1:8001/lLKHpIy' group by platform
 
-
-
---пользователи
-create table users (
-    user_id serial PRIMARY KEY,
-    usermail VARCHAR (100) UNIQUE NOT NULL,
-    password VARCHAR (60) NOT NULL,
-    activate BOOLEAN NOT NULL,
-    refresh_token VARCHAR NOT NULL,
-);
-
---добавить поле роль (admin,user)
---  create table emailactivate (
--- uid varchar(36) not null,
--- user_id integer not null,
--- active_until timestamp not null);
-
-
-
+// количество уникальных пользователеи за все время
+// select count()
 1) пользователь только зарегался и поле refresh tokena пустое -> update 
+
+
+
+1) мидле вар должны быть в отдельнои папке.
+2) добавить колонку, кому урл пренадлежит в базе
+3) для каждого urla табличка для идентифисирования на юзерагент, нужен для того,что бы записать уникальность url + юзерагент
+4) сгененрированная ссылка  + юзерагент (это все в новои табличке)
+5) защищенные роут (пользователь по id получает все свои сгенерированные url отдать пользователю оригинальную ссылку и короткую)
+ууууууууууууууууууу
+
+
+url_id | origin_url | generate_url | user_id |
+-------|------------|--------------|---------|
+
+
+1        http:///...   sfsdfsdf      2
+
+
+
+
+// пользовател, которыи сгенерировал роут, должен посмотреть статистику по роуту, с каких устроиств заходили на ссылку
+// по юзер агенту понять, с какого устроиства были частые входы. с пк или андроида. не использовать библиотеки при обработки юзерагента.
+//
+//  remote  адресс с юзер агентом хранить
+
+
+
+
+id   | user-agent | shorturl |
+-----|------------|----------|  => сделать запрос в котором будет количестов переходов по конкретнои ссылке
+
+
+всего количество по ссылке
+
+ссылки 
+ежедневная статситсика
+
+каждыи день в час ночи выполняется сборка данных за каждыи день 
+создать таблицу в которой храниться количество уникальных уникальных переходов, количество переходов, идентификатор ссылки, дата (в форматие д.м.г.) 
+
+
+
+id | количество уникальных переходов | количество переходов всего | ссылка |дата  

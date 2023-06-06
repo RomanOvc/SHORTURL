@@ -23,7 +23,7 @@ func SendEmailToConfirm(userEmail, genUrl string) (bool, error) {
 
 	err := smtp.SendMail("smtp.gmail.com:587",
 		smtp.PlainAuth("wtf", from, pass, "smtp.gmail.com"),
-		from, []string{to}, []byte(msg))
+		from, []string{to}, []byte(msg)) // FIXME тут отступ убери
 
 	if err != nil {
 		log.Printf("smtp error: %s", err)
@@ -62,7 +62,7 @@ func SendEmailToPassReset(userEmail, resetToken string) error {
 
 	err := smtp.SendMail("smtp.gmail.com:587",
 		smtp.PlainAuth("wtf", from, pass, "smtp.gmail.com"),
-		from, []string{to}, []byte(msg))
+		from, []string{to}, []byte(msg)) // FIXME отступ убери
 
 	if err != nil {
 		log.Printf("smtp error: %s", err)
@@ -72,7 +72,7 @@ func SendEmailToPassReset(userEmail, resetToken string) error {
 }
 
 func AccessTokenParce(token string) (string, error) {
-
+	// FIXME отступ убери
 	tokenString, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -83,6 +83,7 @@ func AccessTokenParce(token string) (string, error) {
 		return MySignedAccessRefreshToken, nil
 	})
 
-	userEmail := tokenString.Claims.(jwt.MapClaims)["usermail"].(string)
+	userEmail := tokenString.Claims.(jwt.MapClaims)["usermail"].(string) // FIXME зачем высирать новую переменную если можно ->
+	// FIXME return tokenString.Claims.(jwt.MapClaims)["usermail"].(string), err
 	return userEmail, err
 }

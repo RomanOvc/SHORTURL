@@ -29,8 +29,8 @@ func (r *InquirysRepository) AddGenerateUrl(ctx context.Context, shorturl, url, 
 		err         error
 		tx          *sql.Tx
 		shorturlRes string
-	)
-	tx, err = r.db.BeginTx(ctx, nil)
+	) // FIXME отступ
+	tx, err = r.db.BeginTx(ctx, nil) // FIXME ошибку обработай!!!!
 
 	defer func() {
 		if err != nil {
@@ -46,40 +46,38 @@ func (r *InquirysRepository) AddGenerateUrl(ctx context.Context, shorturl, url, 
 	err = tx.QueryRowContext(ctx, "INSERT INTO shortedurl (shorturl, originalurl,userid) VALUES ($1, $2, $3) RETURNING shorturl ;", shorturl, url, userId).Scan(&shorturlRes)
 	if err != nil {
 		return "", fmt.Errorf("insert error: %w", err)
-	}
-	tx.Commit()
+	} // FIXME отступ
+	tx.Commit() // FIXME отступ
 	return shorturlRes, err
 }
 
 func (r *InquirysRepository) SelectShortUrlCount(shorturl string) (int, error) {
-	var counter int
+	var counter int // FIXME отступ
 	err := r.db.QueryRow("SELECT count(shorturl) FROM shortedurl where shorturl = $1", shorturl).Scan(&counter)
 	if err != nil {
 		return 0, errors.Wrap(err, "repository/inquirys  SelectShortUrlCount() method error")
-	}
+	} // FIXME отступ
 	return counter, err
 }
 
 func (r *InquirysRepository) SelectOriginalUrl(shorturl string) (string, error) {
-	var originalUrl string
+	var originalUrl string // FIXME отступ
 	err := r.db.QueryRow("SELECT originalurl FROM shortedurl where shorturl = $1 ", shorturl).Scan(&originalUrl)
 	if err != nil {
 		return "", fmt.Errorf("%w", err)
-	}
+	} // FIXME отступ
 	return originalUrl, err
 }
 
 func (r *InquirysRepository) SelectShortUrl(originalUrl string) (string, error) {
 	var shorturl string
+	// FIXME если начал писать операторы в верхнем регистре (SELECT,FROM) то продолжай (where??????)
 	err := r.db.QueryRow("SELECT shorturl FROM shortedurl where originalurl = $1 ", originalUrl).Scan(&shorturl)
 	if err != nil {
 		return "", errors.Wrap(err, "repository/inquirys  SelectOriginalUrl() method error")
 	}
 	return shorturl, err
 }
-
-// TODO
-//
 
 type UrlsByUserStruct struct {
 	OriginUrl string `json:"origin_url"`
@@ -99,23 +97,23 @@ func (r *InquirysRepository) SelectUrlsByUser(ctx context.Context, useremail str
 		var uS UrlsByUserStruct
 
 		err := rows.Scan(&uS.ShortUrl, &uS.OriginUrl)
-
+		// FIXME отступ убери
 		if err != nil {
 			return nil, errors.Wrap(err, "no user_id")
-		}
+		} // FIXME отступ
 		urlsByUserStruct = append(urlsByUserStruct, uS)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, errors.Wrap(err, "no rows")
-	}
+	} // FIXME отступ
 	return &urlsByUserStruct, nil
 
 }
 
 // TODO добавление данных: юзер агент, коротка ссылка,
 func (r *InquirysRepository) AddActivityInfo(ctx context.Context, shortUrl, userAgent, userPlatform string) (int, error) {
-	var (
+	var ( // FIXME почему не var activityId int ?????
 		activityId int
 	)
 
@@ -136,29 +134,29 @@ func (r *InquirysRepository) VisitStatistic(ctx context.Context, shortUrl string
 	rows, err := r.db.QueryContext(ctx, "select platform,count(platform)as count from activity where shorturl=$1 group by platform", shortUrl)
 	if err != nil {
 		return nil, errors.Wrap(err, "error select")
-	}
-	defer rows.Close()
-	var visitOnUrl []VisitOnUrl
+	} // FIXME отступ
+	defer rows.Close()          // FIXME отступ
+	var visitOnUrl []VisitOnUrl // FIXME отступ
 	for rows.Next() {
-		var v VisitOnUrl
+		var v VisitOnUrl // FIXME отступ
 		err := rows.Scan(&v.Platform, &v.Coint)
 		if err != nil {
 			return nil, errors.Wrap(err, "error add into mass")
-		}
+		} // FIXME отступ
 		visitOnUrl = append(visitOnUrl, v)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, errors.Wrap(err, "error add")
-	}
+	} // FIXME отступ
 	return visitOnUrl, nil
 
 }
 
 func (r *InquirysRepository) CountVisitOnURL(ctx context.Context, url string) (int, error) {
-	var countVisit int
+	var countVisit int // FIXME отступ
 	err := r.db.QueryRowContext(ctx, "select count(activity_id) from activity where shorturl=$1", url).Scan(&countVisit)
 	if err != nil {
 		return 0, errors.Wrap(err, "error add")
-	}
+	} // FIXME отступ
 	return countVisit, err
 }

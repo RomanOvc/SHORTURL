@@ -230,6 +230,7 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	}
 }
 
+// FIXME все типы в начале файла -> затем экспортируемые функции -> затем не экспортируемые функции
 type RefreshTokenStruct struct {
 	RefreshToken string `json:"refresh_token"`
 }
@@ -261,9 +262,16 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 		} else {
 			w.Write(message)
 		}
+		// FIXME зачем тут конструкция if else есл можно так
+		// if err != nil {
+		// 	log.Println(err, "Error xtyyuyg")
+		// 	w.WriteHeader(400)
+		// }
+		// w.Write(message)
+
 	}()
 
-	var rT RefreshTokenStruct
+	var rT RefreshTokenStruct // FIXME отступ
 	err = json.NewDecoder(r.Body).Decode(&rT)
 	if err != nil {
 		message, _ = json.Marshal(&MessageError{Message: "body is empty"})
@@ -357,14 +365,14 @@ type CheckUserStruct struct {
 }
 
 func (rep *AuthInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json") // FIXME Почемы ты сетишь заголовок ПЕРЕД объявлением переменны?
 	var (
 		message        []byte
 		err            error
 		checkUser      CheckUserStruct
 		checkUserEmail *repository.UserInfoResponseStruct
 		resetToken     string
-	)
+	) // FIXME отступ
 	defer func() {
 		if err != nil {
 			log.Println("error handler/authhandler ForgotPasswordH()")
@@ -454,6 +462,7 @@ func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 		err        error
 	)
 	defer func() {
+		// FIXME if else не нужен
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write(message)
@@ -504,6 +513,7 @@ func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// FIXME везде ошибки Marshal обработай пример: ("encode error: %w", err)
 	message, _ = json.Marshal(&MessageError{Message: "successfuljt password reset "})
 
 }

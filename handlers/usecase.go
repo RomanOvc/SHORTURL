@@ -51,7 +51,7 @@ func GenerateResetToken(userEmail string, userId int) (string, error) {
 	h, err := hashids.NewWithData(hd)
 	if err != nil {
 		return "", fmt.Errorf("hash process: %w", err)
-	}
+	} // FIXME отступ
 	e, err := h.EncodeInt64([]int64{int64(userId)})
 	if err != nil {
 		return "", fmt.Errorf("EncodeInt64: %w", err)

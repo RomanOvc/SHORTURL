@@ -55,10 +55,10 @@ func (r *AuthInquirysRepository) CreateUser(ctx context.Context, usermail, passw
 }
 
 func (r *AuthInquirysRepository) CheckUserUuidToEmail(ctx context.Context, uuid string) error {
-
+	// FIXME отступ убери
 	var resUserId int
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, nil) // FIXME почему ошибку не обработал????
 
 	defer func() {
 		if err != nil {
@@ -76,16 +76,16 @@ func (r *AuthInquirysRepository) CheckUserUuidToEmail(ctx context.Context, uuid 
 	_, err = r.db.ExecContext(ctx, "UPDATE users SET activate = $2 WHERE user_id = $1", resUserId, true)
 	if err != nil {
 		return errors.Wrap(err, "repository/authinquirys UpdateActivateStatus() method error")
-	}
-	tx.Commit()
+	} // FIXME отступ
+	tx.Commit() // FIXME отступ
 	return err
 
 }
 
 func (r *AuthInquirysRepository) UpdateActivateStatus(ctx context.Context, usermail string) (int, error) {
 	// добавит удаление записи из табли emailactivate
-	var userId int
-	tx, err := r.db.BeginTx(ctx, nil)
+	var userId int                    // FIXME отступ
+	tx, err := r.db.BeginTx(ctx, nil) // FIXME почему ошибку не обработал????
 
 	defer func() {
 		if err != nil {
@@ -123,12 +123,12 @@ func (r *AuthInquirysRepository) SelectUserIdByMail(ctx context.Context, userEma
 
 // позже будет возвращть объект пользователя, для создания токена
 func (r *AuthInquirysRepository) SelectUserByUserEmail(ctx context.Context, userEmail string) (*UserInfoResponseStruct, error) {
-	var userInfoRep UserInfoResponseStruct
-	ro := r.db.QueryRowContext(ctx, "SELECT user_id, usermail, password,activate FROM users where usermail = $1", userEmail)
+	var userInfoRep UserInfoResponseStruct                                                                                   // FIXME отступ
+	ro := r.db.QueryRowContext(ctx, "SELECT user_id, usermail, password,activate FROM users where usermail = $1", userEmail) // FIXME отступ
 	err := ro.Scan(&userInfoRep.UserId, &userInfoRep.UserEmail, &userInfoRep.Pass, &userInfoRep.Activate)
 	if err != nil {
 		errors.Wrap(err, "repository/auth_inquirys UpdateActivateStatus() method error")
-	}
+	} // FIXME отступ
 	return &userInfoRep, err
 }
 

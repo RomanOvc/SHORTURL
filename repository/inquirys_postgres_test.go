@@ -10,7 +10,7 @@ import (
 )
 
 func TestSelectShortUrlCount(t *testing.T) {
-
+	// FIXME отступ убери
 	testcase := []struct {
 		input  string
 		mocka  func(sqlmock.Sqlmock)
@@ -92,7 +92,7 @@ func TestSelectOriginalUrl(t *testing.T) {
 }
 
 func TestAddGenerateUrl(t *testing.T) {
-
+	// FIXME отступ убери
 	testcase := []struct {
 		shorturl    string
 		originalurl string
@@ -144,11 +144,11 @@ func TestAddGenerateUrl(t *testing.T) {
 	}
 
 	for _, tc := range testcase {
-
+		// FIXME отступ убери
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("%d", err)
-		}
+		} // FIXME отступ
 		defer db.Close()
 
 		tc.mocka(mock)

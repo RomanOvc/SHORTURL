@@ -20,7 +20,7 @@ var platforms []string = []string{
 func MassStrings(str string) []string {
 	f := func(c rune) bool {
 		return !unicode.IsLetter(c) && c == '(' || c == ')' || c == ';'
-	}
+	} // FIXME отступ
 	return strings.FieldsFunc(str, f)
 }
 

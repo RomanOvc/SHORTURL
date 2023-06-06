@@ -23,7 +23,7 @@ func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redi
 func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) func(next http.HandlerFunc) http.Handler {
 	return func(next http.HandlerFunc) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer r.Body.Close()
+			defer r.Body.Close() // FIXME отступ
 			var tokenHeader = r.Header["Token"]
 
 			if r.Header["Token"][0] == "" {

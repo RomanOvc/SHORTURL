@@ -90,7 +90,7 @@ func (r *RedisClient) AddResetToken(ctx context.Context, resetToken, userEmail s
 
 // return Reset_token
 func (r *RedisClient) GetResetTokenForCheckUserEmail(ctx context.Context, resetToken string) (string, error) {
-	var userEmail string
+	var userEmail string // FIXME отступ
 	err := r.redisDbTable2.Get(ctx, resetToken).Scan(&userEmail)
 	if err != nil {
 		errors.Wrapf(err, "error 'get comand to redis' repository/inqurys_redis GetRefreshTokenByUSerEmail()")

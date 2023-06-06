@@ -37,7 +37,7 @@ type ShortUrlRespStruct struct {
 // }
 // FIXME  зарегистрированни пользователь может генерировать url
 func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
-
+	// FIXME пробел убрать
 	var (
 		originalurl UrlReqStruct
 		err         error
@@ -108,7 +108,7 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 			message, _ = json.Marshal(&MessageError{Message: "error adding url"})
 
 			return
-		}
+		} // FIXME отступ
 		message, _ = json.Marshal(&ShortUrlRespStruct{ShortUrl: redirectRoute + addShortUrl})
 	}
 }
@@ -182,7 +182,7 @@ func (rep *UseRepository) AllUsersUrls(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write(message)
 		}
-	}()
+	}() // FIXME отступ
 	w.Header().Set("content-type", "application/json")
 
 	accessToken := r.Header["Token"][0]
@@ -215,7 +215,7 @@ func (rep *UseRepository) VisitOnUrlH(w http.ResponseWriter, r *http.Request) {
 		message        []byte
 		err            error
 		visitStatistic []repository.VisitOnUrl
-	)
+	) // FIXME отступ
 	defer func() {
 		if err != nil {
 			log.Println(err, "error request handlers/handler CreateShortUrl()")
@@ -224,7 +224,7 @@ func (rep *UseRepository) VisitOnUrlH(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write(message)
 		}
-	}()
+	}() // FIXME отступ
 	w.Header().Set("content-type", "application/json")
 	vars := mux.Vars(r)
 	shortURL := vars["url_index"]
@@ -237,7 +237,7 @@ func (rep *UseRepository) VisitOnUrlH(w http.ResponseWriter, r *http.Request) {
 		message, _ = json.Marshal(&MessageError{Message: "url does not exist "})
 
 		return
-	}
+	} // FIXME отступ
 	if visitStatistic == nil {
 		log.Println("err handlers/handler in VisitOnUrlH() method VisitStatistic()")
 		message, _ = json.Marshal(&MessageError{Message: "url does not exist "})
@@ -264,7 +264,7 @@ func (rep *UseRepository) CountVisitH(w http.ResponseWriter, r *http.Request) {
 		message []byte
 		err     error
 	)
-	w.Header().Set("content-type", "application/json")
+	w.Header().Set("content-type", "application/json") // FIXME под defer
 	defer func() {
 		if err != nil {
 			w.Write(message)
@@ -272,7 +272,7 @@ func (rep *UseRepository) CountVisitH(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Write(message)
 		}
-	}()
+	}() // FIXME отступ
 	res := mux.Vars(r)
 	index := res["url_index"]
 

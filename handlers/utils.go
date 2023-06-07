@@ -49,7 +49,7 @@ func ChechHashPass(hashPass string, originPass string) error {
 }
 
 func SendEmailToPassReset(userEmail, resetToken string) error {
-	body := "http://127.0.0.1:8000/auth/resetpass/" + resetToken
+	body := "http://127.0.0.1:8001/auth/resetpass/" + resetToken
 
 	from := "roman.ovcharov.1997@gmail.com"
 	pass := "wfxkixwblqzwnref"

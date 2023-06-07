@@ -71,6 +71,7 @@ func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Re
 		message, _ = json.Marshal("error create user")
 
 	}
+
 	if userInfo.UserEmail == "" || userInfo.Password == "" || emptyUser != 0 {
 		log.Println("error: handlers/authandler CreateUserH() method SelectUSerIdMail() ")
 		message, _ = json.Marshal(&MessageError{Message: "invalid params"})
@@ -167,7 +168,6 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 
 		return
 	}
-	log.Println(userInfo)
 
 	user, err := rep.Psql.SelectUserByUserEmail(r.Context(), userInfo.UserEmail)
 	if err != nil {
@@ -176,6 +176,8 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 
 		return
 	}
+
+	log.Println(user)
 
 	if user.UserEmail == "" || r.Body == http.NoBody {
 		// если пользователя нет, то статус 400
@@ -187,7 +189,8 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	checkPass := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
 	if checkPass != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		// TODO -  добавить обработку ошибки
+		message, _ = json.Marshal(&MessageError{"error pass"})
+
 		return
 	}
 
@@ -205,6 +208,7 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	// access и refresh tokens записывать в разные таблички
 
 	// access token
+
 	err = rep.Redis.AddAccessToken(r.Context(), user.UserEmail, accessToken)
 	if err != nil {
 		log.Println("error AddAccessToken")
@@ -270,6 +274,8 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 
 		return
 	}
+
+	log.Println(&rT)
 	// TODO
 	token, err := jwt.Parse(rT.RefreshToken, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -472,6 +478,10 @@ func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// проверку пользователя нужно оформить
+
+	log.Println("user email ", userEmailFromRedis)
+
 	err = json.NewDecoder(r.Body).Decode(&changePass)
 	if err != nil {
 		log.Println("error body")
@@ -503,7 +513,7 @@ func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	message, _ = json.Marshal(&MessageError{Message: "successfuljt password reset "})
+	message, _ = json.Marshal(&MessageError{Message: "successfull password reset "})
 
 }
 

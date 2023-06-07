@@ -78,9 +78,6 @@ func (r *InquirysRepository) SelectShortUrl(originalUrl string) (string, error) 
 	return shorturl, err
 }
 
-// TODO
-//
-
 type UrlsByUserStruct struct {
 	OriginUrl string `json:"origin_url"`
 	ShortUrl  string `json:"short_url"`
@@ -113,7 +110,6 @@ func (r *InquirysRepository) SelectUrlsByUser(ctx context.Context, useremail str
 
 }
 
-// TODO добавление данных: юзер агент, коротка ссылка,
 func (r *InquirysRepository) AddActivityInfo(ctx context.Context, shortUrl, userAgent, userPlatform string) (int, error) {
 	var (
 		activityId int

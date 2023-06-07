@@ -108,12 +108,12 @@ func (r *AuthInquirysRepository) UpdateActivateStatus(ctx context.Context, userm
 }
 
 // ????????????????????
-// FIXME maybe select user id by email
+
 func (r *AuthInquirysRepository) SelectUserIdByMail(ctx context.Context, userEmail string) (int, error) {
 	var userId int
 
 	err := r.db.QueryRowContext(ctx, "SELECT user_id from users where usermail = $1 ", userEmail).Scan(&userId)
-	// FIXME handle error
+	// FIXME handle errorЫ
 	if err != nil {
 		return 0, errors.Wrap(err, "select user id by email")
 	}
@@ -146,7 +146,6 @@ func (r *AuthInquirysRepository) SelectByUserId(ctx context.Context, userId int)
 
 // hash origin pass
 func (r *AuthInquirysRepository) ChangePass(ctx context.Context, userEmail, hashOriginPass string) error {
-
 	err := r.db.QueryRowContext(ctx, "UPDATE users SET password=$1 where usermail=$2", hashOriginPass, userEmail).Err()
 	if err != nil {
 		errors.Wrap(err, "asdasdasdasdadasdasdasd")

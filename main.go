@@ -43,19 +43,7 @@ func main() {
 		DB:       0,
 	})
 
-	dbRedisTable1 := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       1,
-	})
-
-	dbRedisTable2 := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       2,
-	})
-
-	redisClient := repository.NewRedisReposiory(dbRedisTable0, dbRedisTable1, dbRedisTable2)
+	redisClient := repository.NewRedisReposiory(dbRedisTable0)
 	authrep := repository.NewAuthInquirysRepository(dbPostgres)
 	authHandler := handlers.NewAuthInquirysRepository(authrep, redisClient)
 	rep := repository.NewInquirysRepository(dbPostgres)
@@ -89,8 +77,7 @@ func main() {
 	router.HandleFunc("/auth/refresh", authHandler.RefreshTokenH).Methods("POST")
 	router.HandleFunc("/auth/confirm/{uuid}", authHandler.EmailActivateH).Methods("GET")
 	router.HandleFunc("/auth/forgotpass", authHandler.ForgotPasswordH).Methods("POST") //сменить на PATCH
-	// router.HandleFunc("/auth/logout", authHandler.LogoutH).Methods("GET")
-
+	router.HandleFunc("/auth/resetpass/{resetToken}", authHandler.ResetPassH).Methods("POST")
 	server := http.Server{
 		Addr:              ":8001",
 		Handler:           router,

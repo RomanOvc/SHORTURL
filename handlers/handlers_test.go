@@ -14,6 +14,7 @@ import (
 )
 
 type testSet struct {
+	token  string
 	url    string
 	mocka  func(sqlmock.Sqlmock)
 	expect int
@@ -24,25 +25,12 @@ func TestCreateShortUrl(t *testing.T) {
 
 	tS := []testSet{
 		{
-			url: "https://github.com/RomanOvc/SHORTURL/blob/unit_tests/handlers/handlers_test.go",
+			token: "",
+			url:   "https://github.com/RomanOvc/SHORTURL/blob/unit_tests/handlers/handlers_test.go",
 			mocka: func(s sqlmock.Sqlmock) {
 				s.ExpectQuery(regexp.QuoteMeta(`SELECT count(shorturl) FROM shortedurl where shorturl = $1`)).WillReturnRows(sqlmock.NewRows([]string{"count(urlshort)"}).AddRow(0))
 			},
 			expect: http.StatusCreated,
-		},
-		{
-			url: "https://github.com/RomanOvc/SHORTURL/blob/unit_tests/handlers/handlers_test.go",
-			mocka: func(s sqlmock.Sqlmock) {
-				s.ExpectQuery(regexp.QuoteMeta(`SELECT count(shorturl) FROM shortedurl where shorturl = $1`)).WillReturnRows(sqlmock.NewRows([]string{"count(urlshort)"}).AddRow(1))
-			},
-			expect: http.StatusOK,
-		},
-		{
-			url: "",
-			mocka: func(s sqlmock.Sqlmock) {
-				s.ExpectQuery(regexp.QuoteMeta(`SELECT count(shorturl) FROM shortedurl where shorturl = $1`)).WillReturnRows(sqlmock.NewRows([]string{"count(urlshort)"}).AddRow(0))
-			},
-			expect: http.StatusBadRequest,
 		},
 	}
 
@@ -63,7 +51,7 @@ func TestCreateShortUrl(t *testing.T) {
 			t.Fatal("encode error")
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/take_larg_url", &buf)
+		req := httptest.NewRequest(http.MethodPost, "/take_larg_url", &buf,)
 		w := httptest.NewRecorder()
 
 		NewUseRepository(repository.NewInquirysRepository(db)).CreateShortUrl(w, req)

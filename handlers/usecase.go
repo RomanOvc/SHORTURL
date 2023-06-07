@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/speps/go-hashids"
 )
 
@@ -15,14 +17,45 @@ func ShortUrlReturn(shorturl string) *CreateShortUrlResp {
 }
 
 // method create url = 7 symbols
-func GenerationShortUrl(s string) string {
-	if s != "" {
-		hd := hashids.NewData()
-		hd.Salt = s
-		hd.MinLength = 7
-		h, _ := hashids.NewWithData(hd)
-		e, _ := h.EncodeInt64([]int64{1, 2, 3})
-		return e
+func GenerationShortUrl(s string) (string, error) {
+	if s == "" {
+		return "", fmt.Errorf("empty string")
 	}
-	return ""
+
+	hd := hashids.NewData()
+	hd.Salt = s
+	hd.MinLength = 7
+
+	h, err := hashids.NewWithData(hd)
+	if err != nil {
+		return "", fmt.Errorf("hash process: %w", err)
+	}
+
+	e, err := h.EncodeInt64([]int64{1, 2, 3})
+	if err != nil {
+		return "", fmt.Errorf("EncodeInt64: %w", err)
+	}
+
+	return e, nil
+}
+
+func GenerateResetToken(userEmail string, userId int) (string, error) {
+	if userEmail == "" {
+		return "", fmt.Errorf("empty user email")
+	}
+
+	hd := hashids.NewData()
+	hd.Salt = userEmail
+	hd.MinLength = 7
+
+	h, err := hashids.NewWithData(hd)
+	if err != nil {
+		return "", fmt.Errorf("hash process: %w", err)
+	}
+	e, err := h.EncodeInt64([]int64{int64(userId)})
+	if err != nil {
+		return "", fmt.Errorf("EncodeInt64: %w", err)
+	}
+
+	return e, nil
 }

@@ -33,7 +33,7 @@ func TestGenerateShortUrl(t *testing.T) {
 	}
 
 	for _, d := range datas {
-		got := GenerationShortUrl(d.url)
+		got, _ := GenerationShortUrl(d.url)
 		want := d.result
 		assert.Equal(t, want, got, "want: %v -> got: %v", want, got)
 	}

@@ -17,7 +17,6 @@ import (
 )
 
 func main() {
-
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("err loading: %v", err)

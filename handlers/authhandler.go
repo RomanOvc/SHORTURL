@@ -200,6 +200,7 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 
 		return
 	}
+	// FIXME add error handler
 	accessToken, _ := GenerateAcceessToken(user.UserId, user.UserEmail, user.Activate)
 	refreshToken, _ := GenerateRefreshToken(user.UserId, user.Activate)
 

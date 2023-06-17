@@ -11,13 +11,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type AuthInquirysRepository struct {
+type authInquirysRepository struct {
 	Psql  *repository.AuthInquirysRepository
 	Redis *repository.RedisClient
 }
 
-func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) *AuthInquirysRepository {
-	return &AuthInquirysRepository{Psql: postgres, Redis: redis}
+func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) *authInquirysRepository {
+	return &authInquirysRepository{Psql: postgres, Redis: redis}
 }
 
 func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) func(next http.HandlerFunc) http.Handler {
@@ -50,10 +50,8 @@ func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.Redis
 				// проверяем наличие ключа в redis. Если успешно, возвращаем acceess токен по ключу
 				accessTokenFromRedis, err := redis.GetAccessTokenByUsermail(r.Context(), usermail)
 				if err != nil {
-					log.Println([]byte(`{"message":"token is death"}`))
+					log.Printf("GetAccessTokenByUsermail(): %s", err.Error())
 				}
-
-				log.Println("this token", r.Header["Token"][0])
 
 				// проверяется полученыи токен от пользователя на время жизни токена, валидность, и наличие в redis
 				if token.Raw == accessTokenFromRedis && tokenExp > timeNow && token.Valid {

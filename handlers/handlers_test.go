@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"appurl/models"
 	"appurl/repository"
 	"bytes"
 	"encoding/json"
@@ -47,11 +48,11 @@ func TestCreateShortUrl(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		if err := json.NewEncoder(&buf).Encode(UrlReqStruct{Url: testcase.url}); err != nil {
+		if err := json.NewEncoder(&buf).Encode(models.UrlReqStruct{Url: testcase.url}); err != nil {
 			t.Fatal("encode error")
 		}
 
-		req := httptest.NewRequest(http.MethodPost, "/take_larg_url", &buf,)
+		req := httptest.NewRequest(http.MethodPost, "/take_larg_url", &buf)
 		w := httptest.NewRecorder()
 
 		NewUseRepository(repository.NewInquirysRepository(db)).CreateShortUrl(w, req)

@@ -24,14 +24,13 @@ func GenerateAcceessToken(userId int, usermail string, activate bool) (string, e
 
 	tokenString, err := token.SignedString(Secret)
 	if err != nil {
-		errors.Wrap(err, "error SignedString()")
+		errors.Wrapf(err, "SignedString: %s", err.Error())
 	}
 
 	return tokenString, err
 }
 
 func GenerateRefreshToken(userId int, activate bool) (string, error) {
-
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"userId":   userId,
 		"activate": activate,
@@ -40,7 +39,7 @@ func GenerateRefreshToken(userId int, activate bool) (string, error) {
 
 	tokenRefreshString, err := refreshToken.SignedString(Secret)
 	if err != nil {
-		errors.Wrap(err, "SignedString")
+		errors.Wrapf(err, "SignedString: %s", err.Error())
 	}
 
 	return tokenRefreshString, err

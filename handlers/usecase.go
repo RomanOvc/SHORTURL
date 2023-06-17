@@ -6,12 +6,12 @@ import (
 	"github.com/speps/go-hashids"
 )
 
-type CreateShortUrlResp struct {
+type createShortUrlResp struct {
 	ShortUrl string `json:"shorturl"`
 }
 
-func ShortUrlReturn(shorturl string) *CreateShortUrlResp {
-	return &CreateShortUrlResp{
+func ShortUrlReturn(shorturl string) *createShortUrlResp {
+	return &createShortUrlResp{
 		ShortUrl: "http://127.0.0.1:8000" + "/" + shorturl,
 	}
 }

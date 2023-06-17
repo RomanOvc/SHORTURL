@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"appurl/models"
 	"appurl/repository"
 	"encoding/json"
+	"fmt"
 
 	"log"
 	"net/http"
@@ -16,34 +18,17 @@ const (
 	addActivituRoute = "http://127.0.0.1:8001"
 )
 
-type UseRepository struct {
+type useRepository struct {
 	PsqlRepos *repository.InquirysRepository
 }
 
-func NewUseRepository(Repo *repository.InquirysRepository) *UseRepository {
-	return &UseRepository{PsqlRepos: Repo}
+func NewUseRepository(Repo *repository.InquirysRepository) *useRepository {
+	return &useRepository{PsqlRepos: Repo}
 }
 
-type UrlReqStruct struct {
-	Url string `json:"url"`
-}
-type ShortUrlRespStruct struct {
-	ShortUrl string `json:"short_url"`
-}
-
-type AllUsersUrlsStruct struct {
-	OriginalUrl string `json:"origin_url"`
-	ShortUrl    string `json:"short_url"`
-}
-
-type CountVisit struct {
-	CountVisit int `json:"count_visit"`
-}
-
-func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
-
+func (rep *useRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 	var (
-		originalurl UrlReqStruct
+		originalurl models.UrlReqStruct
 		err         error
 		message     []byte
 		shortedUrl  string
@@ -53,94 +38,90 @@ func (rep *UseRepository) CreateShortUrl(w http.ResponseWriter, r *http.Request)
 
 	defer func() {
 		if err != nil {
-			log.Println(err, "error request handlers/handler CreateShortUrl()")
+			log.Printf("CreateShortUrl(): %s", err)
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write(message)
-		} else {
-			w.Write(message)
 		}
+		w.Write(message)
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
 
-	userEmail, err = AccessTokenParce(r.Header["Token"][0])
+	err = json.NewDecoder(r.Body).Decode(&originalurl)
 	if err != nil {
-		log.Println("token invalid")
-
-		message, err = json.Marshal(&MessageError{Message: "token invalid"})
+		log.Printf("Decode(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error: bad body "})
 
 		return
 	}
 
-	err = json.NewDecoder(r.Body).Decode(&originalurl)
+	userEmail, err = AccessTokenParce(r.Header["Token"][0])
 	if err != nil {
-		message, _ = json.Marshal(&MessageError{Message: "error: bad body "})
-		log.Println("body error")
+		log.Printf("AccessTokenParce(): %s", err.Error())
+		message, err = json.Marshal(&models.MessageError{Message: "token invalid"})
 
 		return
 	}
 
 	validURL, err := url.ParseRequestURI(originalurl.Url)
 	if err != nil {
-		message, _ = json.Marshal(&MessageError{Message: "error: invalid URL"})
-		log.Println("invalid url handlers/handler CreateShortUrl() method ParseRequestURI()")
+		log.Printf("ParseRequestURI(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error: invalid URL"})
 
 		return
 	}
 
 	shortedUrl, err = rep.PsqlRepos.SelectShortUrl(validURL.String())
 	if err != nil {
-		message, _ = json.Marshal(&MessageError{Message: "error: invalid URL"})
-		log.Println("invalid url handlers/handler CreateShortUrl() method SelectShortUrl()")
+		log.Printf("SelectShortUrl(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error: invalid URL"})
 
 		return
 	}
 
 	if shortedUrl != "" {
-		message, err = json.Marshal(&ShortUrlRespStruct{ShortUrl: redirectRoute + shortedUrl})
+		message, err = json.Marshal(&models.ShortUrlRespStruct{ShortUrl: redirectRoute + shortedUrl})
 		if err != nil {
-			log.Println("error Marshal shorturl")
-
+			log.Printf("Marshal(): %s", err.Error())
 			return
 		}
 	} else {
 		generateUrl, err := GenerationShortUrl(originalurl.Url)
 		if err != nil {
-			message, _ = json.Marshal(&MessageError{Message: "error: invalid url"})
-			log.Println("error: handlers/handler CreateShortUrl() GenerationShortURl()")
+			log.Printf("GenerationShortUrl(): %s", err.Error())
+			message, _ = json.Marshal(&models.MessageError{Message: "error: invalid url"})
 
 			return
 		}
 
 		addShortUrl, err = rep.PsqlRepos.AddGenerateUrl(r.Context(), generateUrl, validURL.String(), userEmail)
 		if err != nil {
-			log.Println("error AddGenerateUrl()")
+			log.Printf("AddGenerateUrl(): %s", err.Error())
 			w.WriteHeader(http.StatusUnauthorized)
-			message, _ = json.Marshal(&MessageError{Message: "don't auth"})
+			message, _ = json.Marshal(&models.MessageError{Message: "don't auth"})
 
 			return
 		}
-		message, _ = json.Marshal(&ShortUrlRespStruct{ShortUrl: redirectRoute + addShortUrl})
+		message, _ = json.Marshal(&models.ShortUrlRespStruct{ShortUrl: redirectRoute + addShortUrl})
 	}
 }
 
-func (rep *UseRepository) RedirectShortUrl(w http.ResponseWriter, r *http.Request) {
+func (rep *useRepository) RedirectShortUrl(w http.ResponseWriter, r *http.Request) {
 	var (
-		err        error
-		message    []byte
-		userAgent  string
-		activityId int
-		urlInfo    *repository.InfoUrl
+		err       error
+		message   []byte
+		userAgent string
+		urlInfo   *models.InfoUrl
 	)
+
+	w.Header().Set("Content-Type", "application/json")
 
 	defer func() {
 		if err != nil {
+			log.Printf("RedirectShortUrl(): %s", err)
 			w.WriteHeader(http.StatusNotFound)
-			w.Write(message)
 		}
+		w.Write(message)
 	}()
-
-	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
 	index := vars["url_index"]
@@ -150,118 +131,110 @@ func (rep *UseRepository) RedirectShortUrl(w http.ResponseWriter, r *http.Reques
 
 	urlInfo, err = rep.PsqlRepos.SelectOriginalUrl(index)
 	if err != nil {
-		message, _ = json.Marshal(&MessageError{Message: "error SelectOriginalUrl"})
-		log.Println("error handlers/handler RedirectShortUrl() SelectOriginUrl()")
+		log.Printf("SelectOriginalUrl(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error SelectOriginalUrl"})
 
 		return
 	}
 
-	// log.Println(urlInfo)
-
-	userPlatform := PLatfor(userAgent)
-
-	activityId, err = rep.PsqlRepos.AddActivityInfo(r.Context(), index, res, userPlatform, urlInfo.ShorturlId)
+	_, err = rep.PsqlRepos.AddActivityInfo(r.Context(), index, res, PLatfor(userAgent), urlInfo.ShorturlId)
 	if err != nil {
-		message, _ = json.Marshal(&MessageError{Message: "error add"})
-		log.Println("error handlers/handler RedirectShortUrl() AddActivityInfo()")
+		log.Printf("AddActivityInfo(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error add"})
 
 		return
 	}
-	log.Println(activityId)
+
 	http.Redirect(w, r, urlInfo.OriginalUrl, http.StatusFound)
 }
 
-func (rep *UseRepository) AllUsersUrls(w http.ResponseWriter, r *http.Request) {
+func (rep *useRepository) AllUsersUrls(w http.ResponseWriter, r *http.Request) {
 	var (
 		err        error
 		message    []byte
 		userEmail  string
-		userSelect *[]repository.UrlsByUserStruct
+		userSelect *[]models.UrlsByUserStruct
 	)
-
-	defer func() {
-		if err != nil {
-			w.Write(message)
-			w.WriteHeader(http.StatusBadRequest)
-		} else {
-			w.Write(message)
-		}
-	}()
 
 	w.Header().Set("content-type", "application/json")
 
+	defer func() {
+		if err != nil {
+			log.Printf("AllUsersUrls(): %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		w.Write(message)
+	}()
+
 	userEmail, err = AccessTokenParce(r.Header["Token"][0])
 	if err != nil {
-		log.Println("error: handlers/handler AllUsersUrls() AccessTokenParce() ")
-		message, _ = json.Marshal(&MessageError{Message: "error access token"})
+		log.Printf("AccessTokenParce(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error access token"})
 
 		return
 	}
 
 	userSelect, err = rep.PsqlRepos.SelectUrlsByUser(r.Context(), userEmail)
 	if err != nil {
-		log.Println("error Marshal")
-		message, _ = json.Marshal(&MessageError{Message: "Erorre handlers/handler AllUsersUrls() SelectUrlsByUser()"})
+		log.Printf("SelectUrlsByUser(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "Erorre handlers/handler AllUsersUrls() SelectUrlsByUser()"})
 
 		return
 	}
 
 	message, err = json.Marshal(userSelect)
 	if err != nil {
-		log.Println("error Marshal")
-		message, _ = json.Marshal(&MessageError{Message: "Erorre handlers/handler AllUsersUrls()"})
+		log.Printf("Marshal(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "Erorre handlers/handler AllUsersUrls()"})
 
 		return
 	}
 }
 
-func (rep *UseRepository) VisitOnUrlH(w http.ResponseWriter, r *http.Request) {
+func (rep *useRepository) VisitOnUrlH(w http.ResponseWriter, r *http.Request) {
 	var (
 		message        []byte
 		err            error
-		visitStatistic []repository.VisitOnUrl
+		visitStatistic []models.VisitOnUrl
 	)
-
-	defer func() {
-		if err != nil {
-			log.Println(err, "error request handlers/handler CreateShortUrl()")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write(message)
-		} else {
-			w.Write(message)
-		}
-	}()
 
 	w.Header().Set("content-type", "application/json")
 
+	defer func() {
+		if err != nil {
+			log.Printf("VisitOnUrlH(): %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		w.Write(message)
+	}()
+
 	vars := mux.Vars(r)
 	shortURL := vars["url_index"]
-	fullPath := redirectRoute + shortURL
 
-	visitStatistic, err = rep.PsqlRepos.VisitStatistic(r.Context(), fullPath)
+	visitStatistic, err = rep.PsqlRepos.VisitStatistic(r.Context(), redirectRoute+shortURL)
 	if err != nil {
-		log.Println("err handlers/handler in VisitOnUrlH() method VisitStatistic()")
-		message, _ = json.Marshal(&MessageError{Message: "url does not exist "})
+		log.Printf("VisitStatistic(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "url does not exist "})
 
 		return
 	}
 	if visitStatistic == nil {
-		log.Println("err handlers/handler in VisitOnUrlH() method VisitStatistic()")
-		message, _ = json.Marshal(&MessageError{Message: "url does not exist "})
+		err = fmt.Errorf("visit statisitc is empty")
+		message, _ = json.Marshal(&models.MessageError{Message: "url does not exist "})
 
 		return
 	}
 
 	message, err = json.Marshal(visitStatistic)
 	if err != nil {
-		log.Println("err handlers/handler in VisitOnUrlH() method VisitStatistic()")
-		message, _ = json.Marshal(&MessageError{Message: "error marshaling "})
+		log.Printf("Marshal(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "error marshaling "})
 
 		return
 	}
 }
 
-func (rep *UseRepository) CountVisitH(w http.ResponseWriter, r *http.Request) {
+func (rep *useRepository) CountVisitH(w http.ResponseWriter, r *http.Request) {
 	var (
 		message []byte
 		err     error
@@ -284,15 +257,15 @@ func (rep *UseRepository) CountVisitH(w http.ResponseWriter, r *http.Request) {
 
 	cV, err := rep.PsqlRepos.CountVisitOnURL(r.Context(), url)
 	if err != nil {
-		log.Println("err handlers/handler in VisitOnUrlH() method VisitStatistic()")
-		message, _ = json.Marshal(&MessageError{Message: "search error"})
+		log.Printf("CountVisitOnURL(): %s", err.Error())
+		message, _ = json.Marshal(&models.MessageError{Message: "search error"})
 
 		return
 	}
 
-	message, err = json.Marshal(&CountVisit{CountVisit: cV})
+	message, err = json.Marshal(&models.CountVisit{CountVisit: cV})
 	if err != nil {
-		log.Println("error Marshaling")
+		log.Printf("Marshal(): %s", err.Error())
 
 		return
 	}

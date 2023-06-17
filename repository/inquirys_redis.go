@@ -42,6 +42,7 @@ type RedisInqurysInterface interface {
 // ["access_token"] = usermail
 func (r *RedisClient) AddAccessToken(ctx context.Context, userEmail, accessToken string) error {
 	modifiedStringUserEmail := prefixForAccessToken + userEmail
+
 	err := r.redisDbTable0.Set(ctx, modifiedStringUserEmail, accessToken, time.Minute*15).Err()
 	if err != nil {
 		errors.Wrapf(err, "error 'set comand to redis' repository/inqurys_redis  AddAccessAndRefreshToken()")
@@ -52,8 +53,10 @@ func (r *RedisClient) AddAccessToken(ctx context.Context, userEmail, accessToken
 
 // return access_token
 func (r *RedisClient) GetAccessTokenByUsermail(ctx context.Context, usermail string) (string, error) {
-	modifiedStringUserEmail := prefixForAccessToken + usermail
 	var acceessToken string
+
+	modifiedStringUserEmail := prefixForAccessToken + usermail
+
 	err := r.redisDbTable0.Get(ctx, modifiedStringUserEmail).Scan(&acceessToken)
 	if err != nil {
 		errors.Wrapf(err, "error 'get comand to redis' repository/inqurys_redis  GetAccessTokenByUsermail()")
@@ -65,6 +68,7 @@ func (r *RedisClient) GetAccessTokenByUsermail(ctx context.Context, usermail str
 // add ["user_email"] = refres_htoken
 func (r *RedisClient) AddRefreshToken(ctx context.Context, userEmail, refreshToken string) error {
 	modifiedStringUserEmail := prefixForRefreshToken + userEmail
+
 	err := r.redisDbTable0.Set(ctx, modifiedStringUserEmail, refreshToken, time.Hour*48).Err()
 	if err != nil {
 		errors.Wrap(err, "error 'set comand to redis' repository/inqurys_redis AddRefreshToken()")
@@ -75,19 +79,21 @@ func (r *RedisClient) AddRefreshToken(ctx context.Context, userEmail, refreshTok
 
 // return refresh_token
 func (r *RedisClient) GetRefreshTokenByUserEmail(ctx context.Context, userEmail string) (string, error) {
-	modifiedStringUserEmail := prefixForRefreshToken + userEmail
 	var refreshToken string
+
+	modifiedStringUserEmail := prefixForRefreshToken + userEmail
+
 	err := r.redisDbTable0.Get(ctx, modifiedStringUserEmail).Scan(&refreshToken)
 	if err != nil {
-		errors.Wrapf(err, "error 'get comand to redis' repository/inqurys_redis GetRefreshTokenByUSerEmail()")
+		errors.Wrapf(err, "'get comand to redis' repository/inqurys_redis GetRefreshTokenByUSerEmail()")
 	}
 
 	return refreshToken, err
 }
 
-// add ["reset_token"] = user_Email
 func (r *RedisClient) AddResetToken(ctx context.Context, resetToken, userEmail string) error {
 	modifiedResetToken := prefixForResetToken + resetToken
+
 	err := r.redisDbTable0.Set(ctx, modifiedResetToken, userEmail, time.Minute*5).Err()
 	if err != nil {
 		errors.Wrap(err, "error 'set command to redis' repository/inqurys_redis AddresetToken()")
@@ -96,14 +102,14 @@ func (r *RedisClient) AddResetToken(ctx context.Context, resetToken, userEmail s
 	return err
 }
 
-// return Reset_token
-// ["resetTplen:token"]="user Email"
 func (r *RedisClient) GetResetTokenForCheckUserEmail(ctx context.Context, resetToken string) (string, error) {
-	modifiedResetToken := prefixForResetToken + resetToken
 	var userEmail string
+
+	modifiedResetToken := prefixForResetToken + resetToken
+
 	err := r.redisDbTable0.Get(ctx, modifiedResetToken).Scan(&userEmail)
 	if err != nil {
-		return "nil", fmt.Errorf("Error 'get comand to redis' repository/inqurys_redis GetRefreshTokenByUSerEmail()", err)
+		return "nil", fmt.Errorf("GetResetTokenForCheckUserEmail(): %s", err)
 	}
 
 	return userEmail, err

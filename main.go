@@ -42,6 +42,7 @@ func main() {
 		DB:       0,
 	})
 
+	log.Println("start server")
 	redisClient := repository.NewRedisReposiory(dbRedisTable0)
 	authrep := repository.NewAuthInquirysRepository(dbPostgres)
 	authHandler := handlers.NewAuthInquirysRepository(authrep, redisClient)

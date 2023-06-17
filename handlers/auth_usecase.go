@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -23,7 +22,6 @@ func GenerateAcceessToken(userId int, usermail string, activate bool) (string, e
 		"exp":      time.Now().Add(time.Minute * 15).Unix(),
 	})
 
-	log.Println(token)
 	tokenString, err := token.SignedString(MySignedAccessRefreshToken)
 	if err != nil {
 		errors.Wrap(err, "error SignedString()")

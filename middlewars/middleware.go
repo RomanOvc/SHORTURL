@@ -24,6 +24,7 @@ func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.Redis
 	return func(next http.HandlerFunc) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer r.Body.Close()
+
 			var tokenHeader = r.Header["Token"]
 
 			if r.Header["Token"][0] == "" {

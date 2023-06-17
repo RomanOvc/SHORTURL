@@ -1,40 +1,55 @@
 // -- postgres
 
-// // create schema shorturl;
-// // -- сокращатель ссылок (короткая и оригинальная записи)
-// create table shortedurl(                             
-//     id serial primary key not null,
-//     shorturl varchar(7) not null,
-//     originalurl varchar(100000) not null, UNIQUE(shorturl,originalurl)
-//     userid integer //FIXME добваить foriagn.key
-// );
 
 // create index shorturl_index on shortedurl (shorturl);
 
 // --пользователи
-// create table users (
-//     user_id serial PRIMARY KEY,
-//     usermail VARCHAR (100) UNIQUE NOT NULL,
-//     password VARCHAR (60) NOT NULL,
-//     activate BOOLEAN NOT NULL,
-//     create_time_user TIMESTAMP with time zone NULL   
-// );
+create table users (
+    user_id serial PRIMARY KEY not null,
+    useremail VARCHAR UNIQUE NOT NULL,
+    password VARCHAR NOT NULL,
+    activate boolean NOT NULL,
+    created_user TIMESTAMP with time zone not null,   
+    UNIQUE(useremail)
+);
+
+// Транзакция добавления пользователя данных 
+begin;
+    insert into users (useremail,password,activate,created_user) values ('roman.ovcharov.97@mail.ru','acer5800','f','2023-06-08 00:00:00');
+    insert into emailactivate (uid,user_id,active_until) values ('asd','39','2023-06-08');
+commit;
+
 
 // --добавить поле роль (admin,user)
-// --  create table emailactivate (
-// -- uid varchar(36) not null,
-// -- user_id integer not null, //FIXME добваить foriagn.key
-// -- active_until timestamp not null);
+create table emailactivate (
+    uid varchar(36) not null,
+    user_id integer not null,
+    active_until timestamp with time zone not null,
+    FOREIGN KEY (user_id) REFERENCES users (user_id) on delete cascade on update cascade;
+);
+
 
 // ; activity tabel ->  
-// create table activity(
-//     activity_id serial primary key not null,
-//     shorturl varchar not null,
-//     useragent varchar not null,
-//     platform varchar not null,
-//     click_time TIMESTAMP with time zone NULL
-//                TIMESTAMP with time zone NULL 
-// );
+ create table activity(
+    activity_id serial primary key not null,
+    shorturl varchar UNIQUE not null,
+    useragent varchar not null,
+    platform varchar not null,
+    shorturl_id integer not null,
+    click_time TIMESTAMP with time zone  not NULL,    
+    FOREIGN KEY (shorturl_id) REFERENCES shortedurl(shorturl_id) on delete cascade on update cascade    
+);
+
+ create schema shorturl;
+-- сокращатель ссылок (короткая и оригинальная записи)
+create table shortedurl(                             
+     shorturl_id serial primary key not null,
+     shorturl varchar not null ,
+     originalurl varchar not null,
+     user_id integer not null,
+     FOREIGN KEY (user_id) REFERENCES users (user_id) on delete cascade on update cascade,
+     UNIQUE(shorturl,originalurl)
+);
 
 
 // 
@@ -43,3 +58,15 @@
 // select platform,count(platform) from activity where shorturl='http://127.0.0.1:8001/lLKHpIy' group by platform
 
 // SELECT count(distinct useragent) as count_unique_visits, count(useragent) as count_vists, shorturl FROM activity WHERE click_time BETWEEN '2023-06-02 00:00:00' AND '2023-06-03 00:00:00' GROUP BY shorturl;
+
+create table visit_statistic(
+     visit_id serial primary key not null,
+     count_unique_visit integer not null, 
+     count_all_visit  integer not null,
+     index_url  varchar not null,
+     shorturl_id integer not null,
+     date TIMESTAMP with time zone not null,
+     FOREIGN KEY (shorturl_id) REFERENCES shortedurl(shorturl_id) on delete cascade on update cascade    
+ );
+
+

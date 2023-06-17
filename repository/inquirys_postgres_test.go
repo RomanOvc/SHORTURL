@@ -10,7 +10,6 @@ import (
 )
 
 func TestSelectShortUrlCount(t *testing.T) {
-
 	testcase := []struct {
 		input  string
 		mocka  func(sqlmock.Sqlmock)
@@ -92,7 +91,6 @@ func TestSelectOriginalUrl(t *testing.T) {
 }
 
 func TestAddGenerateUrl(t *testing.T) {
-
 	testcase := []struct {
 		shorturl    string
 		originalurl string
@@ -149,6 +147,7 @@ func TestAddGenerateUrl(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%d", err)
 		}
+
 		defer db.Close()
 
 		tc.mocka(mock)

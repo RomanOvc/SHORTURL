@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceFolder}/fortest/tester.go"
+            "program": "${workspaceFolder}/main.go"
         }
     ]
 }

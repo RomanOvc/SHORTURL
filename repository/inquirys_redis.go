@@ -24,11 +24,6 @@ func NewRedisReposiory(redisDBTable0 *redis.Client) *RedisClient {
 	return &RedisClient{redisDbTable0: redisDBTable0}
 }
 
-var (
-	// FIXME добавить маски для записей в редисе и оставть ОДИН коннект (бд(таблицу))
-	tokensMask = "tokensMask:%s"
-)
-
 type RedisInqurysInterface interface {
 	// Access Token
 	AddAccessToken(ctx context.Context, userEmail, accessToken string) error
@@ -46,12 +41,8 @@ type RedisInqurysInterface interface {
 // вставить access token  и username
 // ["access_token"] = usermail
 func (r *RedisClient) AddAccessToken(ctx context.Context, userEmail, accessToken string) error {
-<<<<<<< HEAD
 	modifiedStringUserEmail := prefixForAccessToken + userEmail
 	err := r.redisDbTable0.Set(ctx, modifiedStringUserEmail, accessToken, time.Minute*15).Err()
-=======
-	err := r.redisDbTable0.Set(ctx, fmt.Sprintf(tokensMask, userEmail), accessToken, time.Minute*15).Err()
->>>>>>> c6beaf47ed1cd0b1c97992c7177a18a291ce2299
 	if err != nil {
 		errors.Wrapf(err, "error 'set comand to redis' repository/inqurys_redis  AddAccessAndRefreshToken()")
 	}
@@ -94,7 +85,6 @@ func (r *RedisClient) GetRefreshTokenByUserEmail(ctx context.Context, userEmail 
 	return refreshToken, err
 }
 
-// TODO redis
 // add ["reset_token"] = user_Email
 func (r *RedisClient) AddResetToken(ctx context.Context, resetToken, userEmail string) error {
 	modifiedResetToken := prefixForResetToken + resetToken

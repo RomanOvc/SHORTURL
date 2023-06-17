@@ -35,6 +35,7 @@ func SendEmailToConfirm(userEmail, genUrl string) (bool, error) {
 
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+
 	return string(bytes), err
 
 }
@@ -68,21 +69,37 @@ func SendEmailToPassReset(userEmail, resetToken string) error {
 		log.Printf("smtp error: %s", err)
 		return errors.Wrap(err, "handler/gsmtp/Gsmtp() error")
 	}
+
 	return err
 }
 
 func AccessTokenParce(token string) (string, error) {
-
 	tokenString, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		return MySignedAccessRefreshToken, nil
 	})
-
 	userEmail := tokenString.Claims.(jwt.MapClaims)["usermail"].(string)
+
 	return userEmail, err
+}
+
+func TokenParse(token string) (*jwt.Token, error) {
+	tokenString, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+		return MySignedAccessRefreshToken, nil
+	})
+	if err != nil {
+		log.Println("error auth")
+
+		return nil, err
+	}
+	return tokenString, nil
 }

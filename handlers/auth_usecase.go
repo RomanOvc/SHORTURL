@@ -12,7 +12,7 @@ type AccessAndRefreshToken struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-var MySignedAccessRefreshToken = []byte("shortUrlProjectAccessRefreshKey")
+var Secret = []byte("shortUrlProjectAccessRefreshKey")
 
 func GenerateAcceessToken(userId int, usermail string, activate bool) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -22,7 +22,7 @@ func GenerateAcceessToken(userId int, usermail string, activate bool) (string, e
 		"exp":      time.Now().Add(time.Minute * 15).Unix(),
 	})
 
-	tokenString, err := token.SignedString(MySignedAccessRefreshToken)
+	tokenString, err := token.SignedString(Secret)
 	if err != nil {
 		errors.Wrap(err, "error SignedString()")
 	}
@@ -31,17 +31,16 @@ func GenerateAcceessToken(userId int, usermail string, activate bool) (string, e
 }
 
 func GenerateRefreshToken(userId int, activate bool) (string, error) {
-	refreshToken := jwt.New(jwt.SigningMethodHS256)
 
-	claims := refreshToken.Claims.(jwt.MapClaims)
-	claims["userId"] = userId
-	claims["activate"] = activate
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"userId":   userId,
+		"activate": activate,
+		"exp":      time.Now().Add(time.Minute * 48).Unix(),
+	})
 
-	claims["exp"] = time.Now().Add(time.Hour * 48).Unix()
-
-	tokenRefreshString, err := refreshToken.SignedString(MySignedAccessRefreshToken)
+	tokenRefreshString, err := refreshToken.SignedString(Secret)
 	if err != nil {
-		errors.Wrap(err, "error SignedString()")
+		errors.Wrap(err, "SignedString")
 	}
 
 	return tokenRefreshString, err

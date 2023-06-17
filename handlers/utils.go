@@ -80,7 +80,7 @@ func AccessTokenParce(token string) (string, error) {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return MySignedAccessRefreshToken, nil
+		return Secret, nil
 	})
 	userEmail := tokenString.Claims.(jwt.MapClaims)["usermail"].(string)
 
@@ -94,7 +94,7 @@ func TokenParse(token string) (*jwt.Token, error) {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return MySignedAccessRefreshToken, nil
+		return Secret, nil
 	})
 	if err != nil {
 		log.Println("error auth")

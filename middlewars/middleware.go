@@ -36,7 +36,7 @@ func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.Redis
 					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 						return nil, errors.New("there was an error")
 					}
-					return handlers.MySignedAccessRefreshToken, nil
+					return handlers.Secret, nil
 				})
 
 				// claim по "exp" - expire time

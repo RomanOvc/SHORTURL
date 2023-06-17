@@ -32,6 +32,7 @@ func AddCountVisitOnURLPerDay(db *sql.DB, ctx context.Context) {
 
 	for rows.Next() {
 		var v visitStatistic
+
 		err := rows.Scan(&v.CountUniqueVisits, &v.CountAllVisits, &v.Shorturl, &v.ShorturlId)
 		if err != nil {
 			log.Fatal(err)

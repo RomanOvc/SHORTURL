@@ -14,7 +14,7 @@ func RunCronJob(db *sql.DB) {
 	// s.Cron("0 1 * * *").Do(func() {
 	// 	AddCountVisitOnIURLPerDay(db, ctx)
 	// })
-
+	// FIXME
 	// for test
 	s.Cron("* * * * *").Do(func() {
 		AddCountVisitOnIURLPerDay(db, ctx)

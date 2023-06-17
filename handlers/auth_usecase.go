@@ -12,6 +12,7 @@ type AccessAndRefreshToken struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// FIXME нейм говна
 var MySignedAccessRefreshToken = []byte("shortUrlProjectAccessRefreshKey")
 
 func GenerateAcceessToken(userId int, usermail string, activate bool) (string, error) {

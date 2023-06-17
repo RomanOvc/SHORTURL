@@ -9,6 +9,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// FIXME почему экспортируемое?
 type VisitStatistic struct {
 	Shorturl          string `json:"shorturl"`
 	CountUniqueVisits int    `json:"count_unique_visits"`
@@ -16,6 +17,7 @@ type VisitStatistic struct {
 	ShorturlId        int    `json:"shorturl_id"`
 }
 
+// FIXME drop "I"
 func AddCountVisitOnIURLPerDay(db *sql.DB, ctx context.Context) {
 	dateYesterday := time.Now().Add(-24 * time.Hour)
 	dateStrat := fmt.Sprint(dateYesterday.Format("2006-01-02"))
@@ -32,8 +34,10 @@ func AddCountVisitOnIURLPerDay(db *sql.DB, ctx context.Context) {
 	defer rows.Close()
 
 	var visitOnUrl []VisitStatistic
+
 	for rows.Next() {
 		var v VisitStatistic
+
 		err := rows.Scan(&v.CountUniqueVisits, &v.CountAllVisits, &v.Shorturl, &v.ShorturlId)
 		if err != nil {
 			log.Fatal(err)
@@ -41,10 +45,12 @@ func AddCountVisitOnIURLPerDay(db *sql.DB, ctx context.Context) {
 
 		visitOnUrl = append(visitOnUrl, v)
 	}
+
 	if err = rows.Err(); err != nil {
 		log.Fatal(err)
 	}
 
+	// FIXME это уже продуктовая версия дропни ненужные для сопровождения логи
 	log.Println(visitOnUrl)
 	// unnest (вставка несколикх объектов)
 	// подход к select изменить

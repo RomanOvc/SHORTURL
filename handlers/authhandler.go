@@ -3,6 +3,7 @@ package handlers
 import (
 	"appurl/repository"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -16,13 +17,13 @@ const (
 	confirmURL = "http://127.0.0.1:8001/auth/confirm/"
 )
 
-type AuthInquirysRepository struct {
+type authInquirysRepository struct {
 	Psql  *repository.AuthInquirysRepository
 	Redis *repository.RedisClient
 }
 
-func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) *AuthInquirysRepository {
-	return &AuthInquirysRepository{Psql: postgres, Redis: redis}
+func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) *authInquirysRepository {
+	return &authInquirysRepository{Psql: postgres, Redis: redis}
 }
 
 type UserInfoStruct struct {
@@ -49,7 +50,7 @@ type ChangePassStruct struct {
 	ConfirmPass string `json:"confirm_pass"`
 }
 
-func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Request) {
+func (rep *authInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Request) {
 	var (
 		userInfo    UserInfoStruct
 		message     []byte
@@ -68,6 +69,7 @@ func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Re
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
+
 	err = json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
 		message, _ = json.Marshal(&MessageError{Message: "invalid params"})
@@ -113,31 +115,31 @@ func (rep *AuthInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Re
 
 		return
 	}
+
 	log.Println("message sent")
 	message, _ = json.Marshal(&MessageError{Message: "check you email"})
 
 }
 
 // переход по ссылке из письма
-func (rep *AuthInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http.Request) {
+func (rep *authInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http.Request) {
 	var (
 		err     error
 		message []byte
 	)
 
 	w.Header().Set("Content-Type", "application/json")
+
 	vars := mux.Vars(r)
 	index := vars["uuid"]
 
 	defer func() {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write(message)
 			log.Println("message not send")
-		} else {
-			log.Println("send message")
-			w.Write(message)
 		}
+
+		w.Write(message)
 	}()
 
 	err = rep.Psql.CheckUserUuidToEmail(r.Context(), index)
@@ -157,7 +159,7 @@ func (rep *AuthInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http
 // "usermail":"you mail",
 // "password":"pass"
 // }
-func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r *http.Request) {
+func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r *http.Request) {
 	var (
 		userInfo UserInfoStruct
 		message  []byte
@@ -167,7 +169,7 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	defer func() {
 		if err != nil {
 			log.Println(err, "Error request")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			w.Write(message)
 		} else {
 			w.Write(message)
@@ -186,22 +188,21 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 
 	user, err := rep.Psql.SelectUserByUserEmail(r.Context(), userInfo.UserEmail)
 	if err != nil {
-		log.Println("user is empty")
+		log.Printf("SelectUserByUserEmail: %s", err.Error()) // FIXME
 		message, _ = json.Marshal(&MessageError{Message: "user does not exist"})
 
 		return
 	}
 
 	if user.UserEmail == "" || r.Body == http.NoBody {
-		// если пользователя нет, то статус 400
-		w.WriteHeader(http.StatusBadRequest)
-		// TODO -  добавить обработку ошибки
+		err = fmt.Errorf("body is empty") // FIXME
 		return
 	}
+
 	// проверка пароля
-	checkPass := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
-	if checkPass != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	err = bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
+	if err != nil {
+		log.Printf("CompareHashAndPassword: %s", err.Error())
 		message, _ = json.Marshal(&MessageError{"error pass"})
 
 		return
@@ -252,7 +253,7 @@ func (rep *AuthInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	}
 }
 
-func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.Request) {
+func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.Request) {
 	// 1) получаем refresh token  формате json +
 	// 2) парсим токен +
 	// 3) получаем claims["user_id"] +
@@ -295,7 +296,7 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 		return
 	}
 
-	userId := int(token.Claims.(jwt.MapClaims)["userId"].(float64))
+	userId := token.Claims.(jwt.MapClaims)["userId"].(int)
 	tokenExp := int(token.Claims.(jwt.MapClaims)["exp"].(float64))
 	timeNow := int(time.Now().Unix())
 
@@ -366,7 +367,7 @@ func (rep *AuthInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 
 // запрос на смену парол
 // пользователь вводит свои пароль
-func (rep *AuthInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *http.Request) {
+func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var (
@@ -444,7 +445,7 @@ func (rep *AuthInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 	}
 }
 
-func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Request) {
+func (rep *authInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Request) {
 	// проверяем url и токен из письма
 	// сверили токен с ключом из redis
 	// если успешно, то получили значение по ключу
@@ -482,7 +483,7 @@ func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 
 	// проверку пользователя нужно оформить
 
-	log.Println("user email ", userEmailFromRedis)
+	log.Println("user email ", userEmailFromRedis) // FIXME debuf log убрать
 
 	err = json.NewDecoder(r.Body).Decode(&changePass)
 	if err != nil {
@@ -518,7 +519,7 @@ func (rep *AuthInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 	message, _ = json.Marshal(&MessageError{Message: "successfull password reset "})
 }
 
-// func (rep *AuthInquirysRepository) LogoutH(w http.ResponseWriter, r *http.Request) {
+// func (rep *authInquirysRepository) LogoutH(w http.ResponseWriter, r *http.Request) {
 // 	// полученныи токен поместить в black list до истечения
 
 // }

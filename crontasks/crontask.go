@@ -13,12 +13,9 @@ func RunCronJob(db *sql.DB) {
 	ctx := context.TODO()
 	s.Cron("0 1 * * *").Do(func() {
 		AddCountVisitOnURLPerDay(db, ctx)
+		DeleteExpiredUid(db, ctx)
 	})
 
-	// for test
-	// s.Cron("* * * * *").Do(func() {
-	// 	AddCountVisitOnIURLPerDay(db, ctx)
-	// })
 	s.StartBlocking()
 
 }

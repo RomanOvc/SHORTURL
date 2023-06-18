@@ -53,3 +53,10 @@ func AddCountVisitOnURLPerDay(db *sql.DB, ctx context.Context) {
 		res.RowsAffected()
 	}
 }
+
+func DeleteExpiredUid(db *sql.DB, ctx context.Context) {
+	err := db.QueryRowContext(ctx, `delete from emailactivate WHERE active_until < $1`, time.Now().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		log.Fatal(err)
+	}
+}

@@ -4,7 +4,6 @@ import (
 	"appurl/models"
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -33,19 +32,20 @@ func (r *InquirysRepository) AddGenerateUrl(ctx context.Context, shorturl, url, 
 		}
 	}()
 
+	// FIXME удлаить это нахуи
 	err = tx.QueryRowContext(ctx, `SELECT user_id from users where useremail=$1`, userEmail).Scan(&userId)
 	if err != nil {
-		return "", fmt.Errorf("select err: user is empty: %w", err)
+		return "", errors.Wrap(err, "select err: user is empty")
 	}
 
 	err = tx.QueryRowContext(ctx, `INSERT INTO shortedurl (shorturl, originalurl,user_id) VALUES ($1, $2, $3) RETURNING shorturl ;`, shorturl, url, userId).Scan(&shorturlRes)
 	if err != nil {
-		return "", fmt.Errorf("insert error: %w", err)
+		return "", errors.Wrap(err, "select err: user is empty")
 	}
 
 	tx.Commit()
 
-	return shorturlRes, err
+	return shorturlRes, nil
 }
 
 func (r *InquirysRepository) SelectShortUrlCount(shorturl string) (int, error) {
@@ -53,10 +53,10 @@ func (r *InquirysRepository) SelectShortUrlCount(shorturl string) (int, error) {
 
 	err := r.db.QueryRow(`SELECT count(shorturl) FROM shortedurl where shorturl = $1`, shorturl).Scan(&counter)
 	if err != nil {
-		return 0, errors.Wrap(err, "repository/inquirys  SelectShortUrlCount() method error")
+		return 0, errors.Wrap(err, "SelectShortUrlCount()")
 	}
 
-	return counter, err
+	return counter, nil
 }
 
 func (r *InquirysRepository) SelectOriginalUrl(shorturl string) (*models.InfoUrl, error) {
@@ -65,10 +65,10 @@ func (r *InquirysRepository) SelectOriginalUrl(shorturl string) (*models.InfoUrl
 	ro := r.db.QueryRow(`SELECT shorturl_id,originalurl FROM shortedurl where shorturl = $1`, shorturl)
 	err := ro.Scan(&infourl.ShorturlId, &infourl.OriginalUrl)
 	if err != nil {
-		return nil, fmt.Errorf("%w", errors.New("Scan():"))
+		return nil, errors.Wrap(err, "SelectOriginalUrl()")
 	}
 
-	return &infourl, err
+	return &infourl, nil
 }
 
 func (r *InquirysRepository) SelectShortUrl(originalUrl string) (string, error) {
@@ -111,6 +111,7 @@ func (r *InquirysRepository) SelectUrlsByUser(ctx context.Context, useremail str
 		if err != nil {
 			return nil, errors.Wrap(err, "no user_id")
 		}
+
 		urlsByUserStruct = append(urlsByUserStruct, uS)
 	}
 
@@ -159,10 +160,12 @@ func (r *InquirysRepository) VisitStatistic(ctx context.Context, shortUrl string
 
 	for rows.Next() {
 		var v models.VisitOnUrl
+
 		err := rows.Scan(&v.Platform, &v.Count)
 		if err != nil {
 			return nil, errors.Wrap(err, "error add into mass")
 		}
+
 		visitOnUrl = append(visitOnUrl, v)
 	}
 
@@ -182,5 +185,5 @@ func (r *InquirysRepository) CountVisitOnURL(ctx context.Context, url string) (i
 		return 0, errors.Wrap(err, "error add")
 	}
 
-	return countVisit, err
+	return countVisit, nil
 }

@@ -75,9 +75,11 @@ func main() {
 	router.HandleFunc("/auth", authHandler.CreateUserH).Methods("POST")
 	router.HandleFunc("/auth", authHandler.AuthentificateUserH).Methods("PUT")
 	router.HandleFunc("/auth/refresh", authHandler.RefreshTokenH).Methods("POST")
-	router.HandleFunc("/auth/confirm/{uuid}", authHandler.EmailActivateH).Methods("GET")
+	router.HandleFunc("/auth/confirm/{uid}", authHandler.EmailActivateH).Methods("GET")
 	router.HandleFunc("/auth/forgotpass", authHandler.ForgotPasswordH).Methods("POST") //сменить на PATCH
 	router.HandleFunc("/auth/resetpass/{resetToken}", authHandler.ResetPassH).Methods("POST")
+
+	router.HandleFunc("/auth/repeatconfirm", authHandler.RepeatEmailActivateH).Methods("POST")
 	server := http.Server{
 		Addr:              ":8001",
 		Handler:           router,

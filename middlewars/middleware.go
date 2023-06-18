@@ -23,9 +23,11 @@ func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redi
 func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.RedisClient) func(next http.HandlerFunc) http.Handler {
 	return func(next http.HandlerFunc) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var tokenHeader = r.Header["Token"]
+
 			defer r.Body.Close()
 
-			var tokenHeader = r.Header["Token"]
+			w.Header().Set("Content-Type", "application/json")
 
 			if r.Header["Token"][0] == "" {
 				w.WriteHeader(http.StatusUnauthorized)
@@ -45,7 +47,7 @@ func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.Redis
 				timeNow := int(time.Now().Unix())
 				// claim по "usermail" - имя пользователя
 				usermail := token.Claims.(jwt.MapClaims)["usermail"].(string)
-				// activate := token.Claims.(jwt.MapClaims)["activate"].(bool)
+				activate := token.Claims.(jwt.MapClaims)["activate"].(bool)
 
 				// проверяем наличие ключа в redis. Если успешно, возвращаем acceess токен по ключу
 				accessTokenFromRedis, err := redis.GetAccessTokenByUsermail(r.Context(), usermail)
@@ -55,7 +57,12 @@ func IsAuth(postgres *repository.AuthInquirysRepository, redis *repository.Redis
 
 				// проверяется полученыи токен от пользователя на время жизни токена, валидность, и наличие в redis
 				if token.Raw == accessTokenFromRedis && tokenExp > timeNow && token.Valid {
-					next.ServeHTTP(w, r)
+					if !activate {
+						w.WriteHeader(401)
+						w.Write([]byte(`{"message":"account not active"}`))
+					} else {
+						next.ServeHTTP(w, r)
+					}
 				} else {
 					w.WriteHeader(401)
 					w.Write([]byte(`{"message":"token is death"}`))

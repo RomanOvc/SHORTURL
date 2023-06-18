@@ -7,7 +7,7 @@ type UserInfoStruct struct {
 	Password        string `json:"password"`
 }
 
-type MessageError struct {
+type MessageResponse struct {
 	Message string `json:"message"`
 }
 

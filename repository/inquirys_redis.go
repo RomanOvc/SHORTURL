@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -41,25 +40,21 @@ type RedisInqurysInterface interface {
 // вставить access token  и username
 // ["access_token"] = usermail
 func (r *RedisClient) AddAccessToken(ctx context.Context, userEmail, accessToken string) error {
-	modifiedStringUserEmail := prefixForAccessToken + userEmail
-
-	err := r.redisDbTable0.Set(ctx, modifiedStringUserEmail, accessToken, time.Minute*15).Err()
+	err := r.redisDbTable0.Set(ctx, prefixForAccessToken+userEmail, accessToken, time.Minute*15).Err()
 	if err != nil {
-		errors.Wrapf(err, "error 'set comand to redis' repository/inqurys_redis  AddAccessAndRefreshToken()")
+		return errors.Wrapf(err, "error 'set comand to redis' repository/inqurys_redis  AddAccessAndRefreshToken()")
 	}
 
-	return err
+	return nil
 }
 
 // return access_token
 func (r *RedisClient) GetAccessTokenByUsermail(ctx context.Context, usermail string) (string, error) {
 	var acceessToken string
 
-	modifiedStringUserEmail := prefixForAccessToken + usermail
-
-	err := r.redisDbTable0.Get(ctx, modifiedStringUserEmail).Scan(&acceessToken)
+	err := r.redisDbTable0.Get(ctx, prefixForAccessToken+usermail).Scan(&acceessToken)
 	if err != nil {
-		errors.Wrapf(err, "error 'get comand to redis' repository/inqurys_redis  GetAccessTokenByUsermail()")
+		return "", errors.Wrapf(err, "error 'get comand to redis' repository/inqurys_redis  GetAccessTokenByUsermail()")
 	}
 
 	return acceessToken, err
@@ -67,28 +62,24 @@ func (r *RedisClient) GetAccessTokenByUsermail(ctx context.Context, usermail str
 
 // add ["user_email"] = refres_htoken
 func (r *RedisClient) AddRefreshToken(ctx context.Context, userEmail, refreshToken string) error {
-	modifiedStringUserEmail := prefixForRefreshToken + userEmail
-
-	err := r.redisDbTable0.Set(ctx, modifiedStringUserEmail, refreshToken, time.Hour*48).Err()
+	err := r.redisDbTable0.Set(ctx, prefixForRefreshToken+userEmail, refreshToken, time.Hour*48).Err()
 	if err != nil {
-		errors.Wrap(err, "error 'set comand to redis' repository/inqurys_redis AddRefreshToken()")
+		return errors.Wrap(err, "error 'set comand to redis' repository/inqurys_redis AddRefreshToken()")
 	}
 
-	return err
+	return nil
 }
 
 // return refresh_token
 func (r *RedisClient) GetRefreshTokenByUserEmail(ctx context.Context, userEmail string) (string, error) {
 	var refreshToken string
 
-	modifiedStringUserEmail := prefixForRefreshToken + userEmail
-
-	err := r.redisDbTable0.Get(ctx, modifiedStringUserEmail).Scan(&refreshToken)
+	err := r.redisDbTable0.Get(ctx, prefixForRefreshToken+userEmail).Scan(&refreshToken)
 	if err != nil {
-		errors.Wrapf(err, "'get comand to redis' repository/inqurys_redis GetRefreshTokenByUSerEmail()")
+		return "", errors.Wrapf(err, "'get comand to redis' repository/inqurys_redis GetRefreshTokenByUSerEmail()")
 	}
 
-	return refreshToken, err
+	return refreshToken, nil
 }
 
 func (r *RedisClient) AddResetToken(ctx context.Context, resetToken, userEmail string) error {
@@ -96,10 +87,10 @@ func (r *RedisClient) AddResetToken(ctx context.Context, resetToken, userEmail s
 
 	err := r.redisDbTable0.Set(ctx, modifiedResetToken, userEmail, time.Minute*5).Err()
 	if err != nil {
-		errors.Wrap(err, "error 'set command to redis' repository/inqurys_redis AddresetToken()")
+		return errors.Wrap(err, "error 'set command to redis' repository/inqurys_redis AddresetToken()")
 	}
 
-	return err
+	return nil
 }
 
 func (r *RedisClient) GetResetTokenForCheckUserEmail(ctx context.Context, resetToken string) (string, error) {
@@ -109,8 +100,13 @@ func (r *RedisClient) GetResetTokenForCheckUserEmail(ctx context.Context, resetT
 
 	err := r.redisDbTable0.Get(ctx, modifiedResetToken).Scan(&userEmail)
 	if err != nil {
-		return "nil", fmt.Errorf("GetResetTokenForCheckUserEmail(): %s", err)
+		return "nil", errors.Wrap(err, "error 'set command to redis' repository/inqurys_redis GetResetTokenForCheckUserEmail()")
 	}
 
-	return userEmail, err
+	return userEmail, nil
 }
+
+// при создании пользователя в базу в табличку emailactivate записывается uid, id, время до какого момента можно активировать аккаунт
+// если пользователь создался и не активировал почту, но
+
+// подтверждение почты

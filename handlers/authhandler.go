@@ -29,101 +29,98 @@ func NewAuthInquirysRepository(postgres *repository.AuthInquirysRepository, redi
 
 func (rep *authInquirysRepository) CreateUserH(w http.ResponseWriter, r *http.Request) {
 	var (
-		userInfo    models.UserInfoStruct
-		message     []byte
-		err         error
-		statusEmail bool
+		userInfo       models.UserInfoStruct
+		err            error
+		statusEmail    bool
+		messageForUser string
 	)
 
 	defer func() {
+		var message []byte
 		if err != nil {
-			log.Println(err, "Error request")
-			w.WriteHeader(400)
-			w.Write(nil)
+			w.WriteHeader(http.StatusBadRequest)
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
 		} else {
-			w.Write(message)
+			message, _ = json.Marshal(&models.MessageResponse{Message: messageForUser})
 		}
+		w.Write(message)
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
+
 	err = json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
-		log.Printf("Decode: %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "invalid params"})
+		log.Printf("Decode(): %s", err)
 
 		return
 	}
 
-	emptyUser, err := rep.Psql.SelectUserIdByMail(r.Context(), userInfo.UserEmail)
-	if err != nil {
-		log.Printf("SelectUserIdByMail(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "невозможно добавить"})
-
-		return
-	}
-
-	if userInfo.UserEmail == "" || userInfo.Password == "" || emptyUser != 0 {
-		err = fmt.Errorf("body is empty")
-		message, _ = json.Marshal(&models.MessageError{Message: "user is empty  or invalid pararmetrs"})
+	if userInfo.UserEmail == "" || userInfo.Password == "" {
+		err = fmt.Errorf("the request failed")
 
 		return
 	}
 
 	hashPassword, err := HashPassword(userInfo.Password)
 	if err != nil {
-		err = fmt.Errorf("password is empty")
+		log.Printf("HashPassword(): %s", err.Error())
+		err = fmt.Errorf("password generation failed")
+
 		return
 	}
 
 	generateActivUuid, err := rep.Psql.CreateUser(r.Context(), userInfo.UserEmail, hashPassword, false)
 	if err != nil {
 		log.Printf("CreateUser(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "user is empty"})
+		err = fmt.Errorf("user is empty")
 
 		return
 	}
 
 	statusEmail, err = SendEmailToConfirm(userInfo.UserEmail, confirmURL+generateActivUuid)
 	if err != nil {
-		message, _ = json.Marshal(&models.MessageError{Message: "smtp server error"})
 		log.Printf("SendEmailToConfirm: %s, status send email: %t", err.Error(), statusEmail)
+		err = fmt.Errorf("error send message")
 
 		return
 	}
 
-	message, _ = json.Marshal(&models.MessageError{Message: "check you email"})
-
+	messageForUser = "check you email"
 }
 
 // переход по ссылке из письма
 func (rep *authInquirysRepository) EmailActivateH(w http.ResponseWriter, r *http.Request) {
 	var (
-		err     error
-		message []byte
+		err            error
+		message        []byte
+		messageForUser string
 	)
 
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
-	index := vars["uuid"]
+	uid := vars["uid"]
 
 	defer func() {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			log.Println("message not send")
+			log.Println("EmailActivateH():")
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
+		} else {
+			message, _ = json.Marshal(&models.MessageResponse{Message: messageForUser})
 		}
 		w.Write(message)
 	}()
 
-	err = rep.Psql.CheckUserUuidToEmail(r.Context(), index)
+	err = rep.Psql.UserActivation(r.Context(), uid)
 	if err != nil {
-		log.Printf("CheckUserUuidToEmail(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error message"})
+		log.Printf("UserActivation(): %s", err.Error())
+		err = fmt.Errorf("the letter is outdated")
 
 		return
 	}
 
-	message, _ = json.Marshal(&models.MessageError{Message: "user is active"})
+	messageForUser = "user is active"
 }
 
 func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r *http.Request) {
@@ -135,8 +132,9 @@ func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 
 	defer func() {
 		if err != nil {
-			log.Println(err, "Error request")
+			log.Println("AuthentificateUserH():")
 			w.WriteHeader(http.StatusBadRequest)
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
 		}
 		w.Write(message)
 	}()
@@ -146,7 +144,12 @@ func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	err = json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
 		log.Printf("Decode(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error: body is empty"})
+
+		return
+	}
+
+	if r.Body == http.NoBody || userInfo.UserEmail == "" || userInfo.Password == "" {
+		err = fmt.Errorf("invalid parameter")
 
 		return
 	}
@@ -154,28 +157,15 @@ func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 	user, err := rep.Psql.SelectUserByUserEmail(r.Context(), userInfo.UserEmail)
 	if err != nil {
 		log.Printf("SelectUserByUserEmail(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "user does not exist"})
+		err = fmt.Errorf("incorrect username")
 
 		return
 	}
 
-	if user.UserEmail == "" || r.Body == http.NoBody {
-		err = fmt.Errorf("body is empty")
-		return
-	}
-
-	// проверка пароля
 	err = bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(userInfo.Password))
 	if err != nil {
 		log.Printf("CompareHashAndPassword(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "Error pass"})
-
-		return
-	}
-
-	if !user.Activate {
-		err = fmt.Errorf("user not active account")
-		message, _ = json.Marshal(&models.MessageError{Message: "check mail and activate account"})
+		err = fmt.Errorf("incorrect password")
 
 		return
 	}
@@ -200,7 +190,7 @@ func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 
 		return
 	}
-	// refresh token
+
 	err = rep.Redis.AddRefreshToken(r.Context(), user.UserEmail, refreshToken)
 	if err != nil {
 		log.Printf("AddRefreshToken(): %s", err.Error())
@@ -208,14 +198,78 @@ func (rep *authInquirysRepository) AuthentificateUserH(w http.ResponseWriter, r 
 		return
 	}
 
-	// return pair access and refresh tokens
 	message, err = json.Marshal(AccessRefreshToken(accessToken, refreshToken))
 	if err != nil {
-		message, _ = json.Marshal(&models.MessageError{Message: "error: marshal "})
-		log.Printf("Marshal(): %s", err.Error())
+		log.Printf("Marshal(): %s", err)
+		err = fmt.Errorf("unknown error")
 
 		return
 	}
+}
+
+func (rep *authInquirysRepository) RepeatEmailActivateH(w http.ResponseWriter, r *http.Request) {
+	var (
+		message        []byte
+		err            error
+		useremail      models.CheckUserStruct
+		messageForUser string
+	)
+
+	defer func() {
+		if err != nil {
+			log.Println("AuthentificateUserH():")
+			w.WriteHeader(http.StatusBadRequest)
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
+		} else {
+			message, _ = json.Marshal(&models.MessageResponse{Message: messageForUser})
+		}
+		w.Write(message)
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err = json.NewDecoder(r.Body).Decode(&useremail)
+	if err != nil {
+		log.Printf("Decode(): %s", err)
+
+		return
+	}
+
+	userId, err := rep.Psql.SelectUserIdByMail(r.Context(), useremail.Email)
+	if err != nil {
+		log.Printf("SelectUserIdMail(): %s", err.Error())
+		err = fmt.Errorf("incorrect useremail")
+
+		return
+	}
+
+	uuid, err := rep.Psql.CheckEmailActivate(r.Context(), userId)
+	if err != nil {
+		log.Printf("CheckEmailActivate(): %s", err.Error())
+		err = fmt.Errorf("incorrect")
+
+		return
+	}
+
+	if uuid == "" {
+		uuid, err = rep.Psql.InsertUidForEmailActivate(r.Context(), userId)
+		if err != nil {
+			log.Printf("CheckEmailActivate(): %s", err.Error())
+			err = fmt.Errorf("incorrect useremail")
+
+			return
+		}
+	}
+
+	statusEmail, err := SendEmailToConfirm(useremail.Email, confirmURL+uuid)
+	if err != nil {
+		log.Printf("SendEmailToConfirm: %s, status send email: %t", err.Error(), statusEmail)
+		err = fmt.Errorf("error send message")
+
+		return
+	}
+
+	messageForUser = "check you email"
 }
 
 func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.Request) {
@@ -231,6 +285,7 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 		if err != nil {
 			log.Println(err, "RefreshTokenH()")
 			w.WriteHeader(http.StatusBadRequest)
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
 		}
 		w.Write(message)
 
@@ -239,7 +294,6 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	err = json.NewDecoder(r.Body).Decode(&rT)
 	if err != nil {
 		log.Printf("Decode(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "body is empty"})
 
 		return
 	}
@@ -247,7 +301,7 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	token, err := TokenParse(rT.RefreshToken)
 	if err != nil {
 		log.Printf("TokenParse(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "unauth"})
+		err = fmt.Errorf("unauth")
 
 		return
 	}
@@ -256,11 +310,10 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	tokenExp := int(token.Claims.(jwt.MapClaims)["exp"].(float64))
 	timeNow := int(time.Now().Unix())
 
-	// проверка наличия пользователя по id
 	checkUserId, err := rep.Psql.SelectByUserId(r.Context(), userId)
 	if err != nil {
 		log.Printf("SelectByUserId(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "no empty user or not valid token"})
+		err = fmt.Errorf("no empty user or not valid token")
 
 		return
 	}
@@ -268,20 +321,17 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	checkRefreshToken, err := rep.Redis.GetRefreshTokenByUserEmail(r.Context(), checkUserId.UserEmail)
 	if err != nil {
 		log.Printf("GetRefreshTokenByUserEmail(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "no empty user or not valid token"})
+		err = fmt.Errorf("no empty user or not valid token")
 
 		return
 	}
 
-	// // // если присланныи refresh токен валидныи и не протух, генерим новую пару, иначе  сообщаем, что токен не валиден
 	if checkUserId.UserId == 0 || tokenExp < timeNow || rT.RefreshToken != checkRefreshToken {
 		err = fmt.Errorf("token not valid")
-		message, _ = json.Marshal(&models.MessageError{Message: "no empty user or not valid token"})
 
 		return
 	}
 
-	// // генерация токенов
 	accessToken, err := GenerateAcceessToken(checkUserId.UserId, checkUserId.UserEmail, checkUserId.Activate)
 	if err != nil {
 		log.Printf("GenerateAcceessToken(): %s", err.Error())
@@ -299,7 +349,6 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	err = rep.Redis.AddAccessToken(r.Context(), checkUserId.UserEmail, accessToken)
 	if err != nil {
 		log.Printf("AddAccessToken(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error add access token"})
 
 		return
 	}
@@ -307,7 +356,6 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	err = rep.Redis.AddRefreshToken(r.Context(), checkUserId.UserEmail, refreshToken)
 	if err != nil {
 		log.Printf("AddRefreshToken(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error add refresh token"})
 
 		return
 	}
@@ -315,7 +363,7 @@ func (rep *authInquirysRepository) RefreshTokenH(w http.ResponseWriter, r *http.
 	message, _ = json.Marshal(&AccessAndRefreshToken{AccessToken: accessToken, RefreshToken: refreshToken})
 	if err != nil {
 		log.Printf("Marshal(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error response tokens"})
+		message, _ = json.Marshal(&models.MessageResponse{Message: "error response tokens"})
 
 		return
 	}
@@ -334,8 +382,9 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 
 	defer func() {
 		if err != nil {
-			log.Println("handler/authhandler ForgotPasswordH()")
+			log.Println("ForgotPasswordH()")
 			w.WriteHeader(http.StatusBadRequest)
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
 		}
 		w.Write(message)
 	}()
@@ -344,7 +393,6 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 	err = json.NewDecoder(r.Body).Decode(&checkUser)
 	if err != nil {
 		log.Printf("Decode(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "invalid data handler/authhandler ForgotPasswordH()"})
 
 		return
 	}
@@ -352,7 +400,7 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 	checkUserEmail, err = rep.Psql.SelectUserByUserEmail(r.Context(), checkUser.Email)
 	if err != nil {
 		log.Printf("SelectUserByUserEmail(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "user does not exist"})
+		err = fmt.Errorf("user does not exist")
 
 		return
 	}
@@ -360,14 +408,12 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 	resetToken, err = GenerateResetToken(checkUserEmail.UserEmail, checkUserEmail.UserId)
 	if err != nil {
 		log.Printf("GenerateResetToken(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "reset token generation error"})
 
 		return
 	}
 
 	if resetToken == "" {
 		err = fmt.Errorf("not valid reset token")
-		message, _ = json.Marshal(&models.MessageError{Message: "token not generate"})
 
 		return
 	}
@@ -375,7 +421,6 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 	err = rep.Redis.AddResetToken(r.Context(), resetToken, checkUserEmail.UserEmail)
 	if err != nil {
 		log.Printf("AddResetToken(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error validation token"})
 
 		return
 	}
@@ -383,15 +428,13 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 	err = SendEmailToPassReset(checkUserEmail.UserEmail, resetToken)
 	if err != nil {
 		log.Printf("SendEmailToPassReset(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error send message"})
 
 		return
 	}
 
-	message, err = json.Marshal(&models.MessageError{Message: "a letter has been sent to your mail"})
+	message, err = json.Marshal(&models.MessageResponse{Message: "a letter has been sent to your mail"})
 	if err != nil {
 		log.Printf("Marshal(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "error send message"})
 
 		return
 	}
@@ -399,9 +442,10 @@ func (rep *authInquirysRepository) ForgotPasswordH(w http.ResponseWriter, r *htt
 
 func (rep *authInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Request) {
 	var (
-		changePass models.ChangePassStruct
-		message    []byte
-		err        error
+		changePass     models.ChangePassStruct
+		message        []byte
+		err            error
+		messageForUser string
 	)
 
 	w.Header().Set("contet-type", "applicateion/json")
@@ -410,6 +454,9 @@ func (rep *authInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 		if err != nil {
 			log.Println("ResetPassH(): ")
 			w.WriteHeader(http.StatusBadRequest)
+			message, _ = json.Marshal(&models.MessageResponse{Message: err.Error()})
+		} else {
+			message, _ = json.Marshal(&models.MessageResponse{Message: messageForUser})
 		}
 		w.Write(message)
 	}()
@@ -417,25 +464,22 @@ func (rep *authInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	resetToken := vars["resetToken"]
 
-	userEmailFromRedis, err := rep.Redis.GetResetTokenForCheckUserEmail(r.Context(), resetToken)
+	err = json.NewDecoder(r.Body).Decode(&changePass)
 	if err != nil {
-		log.Printf("GetResetTokenForCheckUserEmail(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "invalid request"})
+		log.Printf("Decode(): %s", err.Error())
 
 		return
 	}
 
-	err = json.NewDecoder(r.Body).Decode(&changePass)
+	userEmailFromRedis, err := rep.Redis.GetResetTokenForCheckUserEmail(r.Context(), resetToken)
 	if err != nil {
-		log.Printf("Decode(): %s", err.Error())
-		message, _ = json.Marshal(&models.MessageError{Message: "invalid data"})
+		log.Printf("GetResetTokenForCheckUserEmail(): %s", err.Error())
 
 		return
 	}
 
 	if changePass.ConfirmPass != changePass.OriginPass {
 		err = fmt.Errorf("confirm pass not equal orign pass ")
-		message, _ = json.Marshal(&models.MessageError{Message: "passwords must be different"})
 
 		return
 	}
@@ -443,7 +487,6 @@ func (rep *authInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 	hashOriginPass, err := HashPassword(changePass.OriginPass)
 	if err != nil {
 		log.Printf("HashPassword(): %s", err)
-		message, _ = json.Marshal(&models.MessageError{Message: "error update pass"})
 
 		return
 	}
@@ -451,10 +494,9 @@ func (rep *authInquirysRepository) ResetPassH(w http.ResponseWriter, r *http.Req
 	err = rep.Psql.ChangePass(r.Context(), userEmailFromRedis, hashOriginPass)
 	if err != nil {
 		log.Printf("ChangePass(): %s", err)
-		message, _ = json.Marshal(&models.MessageError{Message: "an error occurred while updating the password"})
 
 		return
 	}
 
-	message, _ = json.Marshal(&models.MessageError{Message: "successfull password reset "})
+	messageForUser = "successfull password reset "
 }

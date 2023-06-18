@@ -30,13 +30,16 @@ func SendEmailToConfirm(userEmail, genUrl string) (bool, error) {
 		return false, fmt.Errorf("handler/utils SendEmailToConfirm() error %w", err)
 	}
 
-	return true, err
+	return true, nil
 }
 
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	if err != nil {
+		return "", errors.Wrap(err, "error generation pass")
+	}
 
-	return string(bytes), err
+	return string(bytes), nil
 
 }
 
@@ -70,7 +73,7 @@ func SendEmailToPassReset(userEmail, resetToken string) error {
 		return errors.Wrap(err, "handler/gsmtp/Gsmtp() error")
 	}
 
-	return err
+	return nil
 }
 
 func AccessTokenParce(token string) (string, error) {

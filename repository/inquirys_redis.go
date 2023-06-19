@@ -105,8 +105,3 @@ func (r *RedisClient) GetResetTokenForCheckUserEmail(ctx context.Context, resetT
 
 	return userEmail, nil
 }
-
-// при создании пользователя в базу в табличку emailactivate записывается uid, id, время до какого момента можно активировать аккаунт
-// если пользователь создался и не активировал почту, но
-
-// подтверждение почты

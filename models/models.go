@@ -63,3 +63,9 @@ type UrlsByUserStruct struct {
 	OriginUrl string `json:"origin_url"`
 	ShortUrl  string `json:"short_url"`
 }
+
+type ShortUrlStruct struct {
+	Id          string
+	ShortUrl    string
+	OriginalUrl string
+}

@@ -12,7 +12,7 @@ import (
 
 func SendEmailToConfirm(userEmail, genUrl string) (bool, error) {
 	body := genUrl
-	from := "roman.ovcharov.1997@gmail.com"
+	from :="youremailadress"
 	pass := "wfxkixwblqzwnref"
 	to := userEmail
 
